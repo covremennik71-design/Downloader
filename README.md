@@ -1,136 +1,111 @@
-# YouTube Downloader - Tauri + Python Edition
+# YouTube Downloader
 
-## 📋 Описание
+Десктопное приложение для загрузки видео и аудио с YouTube. Два варианта запуска:
 
-Современное десктопное приложение для загрузки видео с YouTube, построенное на архитектуре **Tauri + Python**:
-- **Frontend**: HTML/CSS/JavaScript (современный UI)
-- **Backend**: Rust/Tauri (лёгкий и быстрый)
-- **Download Engine**: Python + yt-dlp
+- **Tauri** — современный UI (HTML/CSS/JS + Rust backend)
+- **Python** — standalone GUI на customtkinter
 
-## 🚀 Быстрый старт
+## Быстрый старт
 
-### Сборка приложения
+### 1. Клонируйте репозиторий
 
+```bash
+git clone https://github.com/covremennik71-design/Downloader.git
+cd Downloader
+```
+
+### 2. Установите зависимости
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Вставьте свой YouTube API ключ
+
+Откройте файл `config.json` и вставьте ключ в поле `youtube_api_key`:
+
+```json
+{
+    "youtube_api_key": "YOUR_API_KEY_HERE",
+    "download_path": "C:\\Users\\Smixr\\Videos\\YouTube",
+    "theme": "dark",
+    "video_format": "mp4",
+    "audio_format": "mp3",
+    "default_quality": "1080p"
+}
+```
+
+> Получить бесплатный ключ: [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → Create API Key → включить **YouTube Data API v3**.
+
+Ключ также можно задать через UI настроек приложения (кнопка "Настройки").
+
+### 4. Запуск
+
+**Python (standalone):**
+```bash
+python downloader.py
+```
+
+**Tauri (сборка EXE):**
 ```bash
 build.bat
 ```
 
-Скрипт автоматически:
-1. Проверит Python, Rust, Node.js
-2. Установит зависимости (yt-dlp, tauri-cli)
-3. Создаст иконку приложения
-4. Соберёт EXE файл
-5. Скопирует EXE в корневую папку
-
-### Запуск
-
-После сборки запустите:
-```
-YouTube Downloader.exe
-```
-
-## 📁 Структура проекта
+## Структура проекта
 
 ```
 Downloader/
-├── build.bat              ← Скрипт сборки (запускать отсюда)
-├── YouTube Downloader.exe ← Готовое приложение (после сборки)
-├── README.md              ← Этот файл
+├── downloader.py          ← Standalone Python загрузчик (customtkinter GUI)
+├── config.json            ← Конфигурация (API ключ, путь, тема)
+├── requirements.txt       ← Python зависимости
+├── build.bat              ← Скрипт сборки Tauri EXE
+├── dev.bat                ← Запуск Tauri в dev-режиме
+├── run.bat                ← Запуск Python версии
+├── download_ffmpeg.bat    ← Скачать ffmpeg автоматически
+├── Downloader.spec        ← Конфигурация PyInstaller
 │
-└── app/                   ← Весь код проекта
+├── ffmpeg/bin/            ← ffmpeg.exe, ffprobe.exe (нужны для слияния видео+аудио)
+│
+└── app/                   ← Tauri приложение
     ├── src/               ← Frontend (HTML/CSS/JS)
     │   ├── index.html
     │   ├── style.css
     │   └── main.js
     │
-    ├── src-tauri/         ← Backend (Rust/Tauri)
-    │   ├── src/
-    │   │   └── main.rs
+    ├── src-tauri/         ← Backend (Rust)
+    │   ├── src/main.rs
     │   ├── Cargo.toml
-    │   ├── tauri.conf.json
-    │   └── icons/
+    │   └── tauri.conf.json
     │
-    ├── backend/           ← Python зависимости
-    │   └── requirements.txt
-    │
-    ├── generate_icon.py   ← Генератор иконки
-    │
+    ├── ffmpeg/bin/        ← ffmpeg для Tauri сборки
     └── docs/              ← Документация
-        ├── README.md
-        ├── DOCUMENTATION.md
-        ├── INSTALL.md
-        └── ...
 ```
 
-## ✨ Возможности
+## Возможности
 
-- ✅ Современный UI с анимациями и градиентами
-- ✅ Получение информации о видео (название, превью, длительность)
-- ✅ Динамический список доступных качеств (144p - 4K)
-- ✅ Выбор формата (видео/аудио)
-- ✅ Извлечение аудио в MP3 320 kbps
-- ✅ Прогресс-бар в реальном времени
-- ✅ Отмена загрузки
-- ✅ Выбор папки сохранения
-- ✅ Настройки приложения
+- Загрузка видео от 144p до 4K
+- Извлечение аудио в MP3 320 kbps
+- Прогресс-бар в реальном времени
+- Выбор папки сохранения
+- Автоматическое слияние видео+аудио через ffmpeg
+- Graceful fallback без ffmpeg (видео без звука)
 
-## 🔧 Требования
+## Требования
 
-- **Python 3.8+** - https://python.org
-- **Rust** - https://rustup.rs
-- **Node.js** - https://nodejs.org (опционально)
-- **WebView2** - обычно уже установлен в Windows 10/11
+- **Python 3.8+**
+- **Rust** (только для сборки Tauri-версии)
+- **ffmpeg** — автоматически скачивается через `download_ffmpeg.bat` или уже находится в `ffmpeg/bin/`
 
-## 📖 Документация
+## ffmpeg
 
-Полная документация находится в папке `app/docs/`:
-- `README.md` - основная информация
-- `DOCUMENTATION.md` - техническая документация
-- `INSTALL.md` - подробная инструкция по установке
-- `STRUCTURE.md` - структура проекта
+Для слияния видео и аудио потоков необходим ffmpeg. Бинарник уже включён в `ffmpeg/bin/`. Если его нет — запустите:
 
-## 🎯 Исправленные проблемы
+```bash
+download_ffmpeg.bat
+```
 
-### Критические исправления:
+Или скачайте вручную: https://www.gyan.dev/ffmpeg/builds/ → `ffmpeg-release-essentials.zip` → скопируйте `ffmpeg.exe` в `ffmpeg/bin/`.
 
-1. **Кнопки не работали** ❌ → ✅
-   - **Причина**: Отсутствовала настройка `withGlobalTauri: true` в `tauri.conf.json`
-   - **Решение**: Добавлена настройка, теперь Tauri API доступен через `window.__TAURI__`
-
-2. **Конфликт features в Cargo.toml** ❌ → ✅
-   - **Причина**: Features не соответствовали allowlist
-   - **Решение**: Упрощён allowlist, синхронизированы features
-
-3. **EXE не в корневой папке** ❌ → ✅
-   - **Причина**: EXE собирался в `src-tauri/target/release/`
-   - **Решение**: Добавлено копирование EXE в корень после сборки
-
-4. **Структура проекта** ❌ → ✅
-   - **Причина**: Все файлы были в корне
-   - **Решение**: Код перемещён в папку `app/`, в корне только `build.bat` и EXE
-
-## 📊 Производительность
-
-| Параметр | Значение |
-|----------|----------|
-| Размер EXE | ~10-15 MB |
-| Потребление RAM | 50-150 MB |
-| Время запуска | 0.5-1 сек |
-| Время сборки (первый раз) | ~30-40 минут |
-| Время сборки (повторно) | ~2-5 минут |
-
-## 🐛 Известные проблемы
-
-- Первая сборка может занять 30-40 минут (компиляция Rust зависимостей)
-- Повторные сборки используют кэш и занимают 2-5 минут
-- Для работы требуется интернет (для загрузки видео)
-
-## 📝 Лицензия
+## Лицензия
 
 MIT License
-
----
-
-**Версия**: 1.0  
-**Дата**: Июль 2026  
-**Автор**: AI Assistant (Qwen)
