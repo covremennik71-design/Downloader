@@ -97,8 +97,8 @@ FFMPEG_PATH = find_ffmpeg()
 
 # ==================== КОНФИГУРАЦИЯ ====================
 DEFAULT_CONFIG = {
-     "youtube_api_key": "your-api-key",
-       "download_path": DOWNLOADS_DIR,
+    "youtube_api_key": "",
+    "download_path": DOWNLOADS_DIR,
     "theme": "dark",
     "video_format": "mp4",
     "audio_format": "mp3",
