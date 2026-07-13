@@ -1,0 +1,387 @@
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+
+use std::process::{Command, Stdio};
+use std::io::{BufRead, BufReader};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use tauri::{Manager, Window, State};
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+// Структура для хранения состояния загрузки
+struct DownloadState {
+    is_downloading: bool,
+}
+
+// Команда для получения информации о видео
+#[tauri::command]
+fn get_video_info(window: Window, url: String) -> Result<String, String> {
+    let python_script = r#"
+import sys
+import json
+import yt_dlp
+
+# Принудительно устанавливаем UTF-8 кодировку для stdout
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
+
+def get_info(url):
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'extract_flat': False,
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            
+            # Получаем доступные форматы
+            formats = []
+            if 'formats' in info:
+                for f in info['formats']:
+                    if f.get('vcodec') != 'none' and f.get('height') is not None:
+                        format_info = {
+                            'format_id': f.get('format_id'),
+                            'height': f.get('height'),
+                            'ext': f.get('ext'),
+                            'filesize': f.get('filesize') or f.get('filesize_approx'),
+                            'fps': f.get('fps'),
+                            'vcodec': f.get('vcodec'),
+                            'acodec': f.get('acodec'),
+                        }
+                        formats.append(format_info)
+            
+            # Сортируем по высоте
+            formats.sort(key=lambda x: x['height'] if x['height'] else 0)
+            
+            # Убираем дубликаты по высоте
+            seen_heights = set()
+            unique_formats = []
+            for f in formats:
+                h = f['height']
+                if h not in seen_heights:
+                    seen_heights.add(h)
+                    unique_formats.append(f)
+            
+            result = {
+                'title': info.get('title', 'Unknown'),
+                'thumbnail': info.get('thumbnail', ''),
+                'duration': info.get('duration', 0),
+                'uploader': info.get('uploader', 'Unknown'),
+                'view_count': info.get('view_count', 0),
+                'formats': unique_formats
+            }
+            
+            print(json.dumps(result, ensure_ascii=False))
+            return 0
+    except Exception as e:
+        print(json.dumps({'error': str(e)}, ensure_ascii=False))
+        return 1
+
+if __name__ == '__main__':
+    url = sys.argv[1]
+    sys.exit(get_info(url))
+"#;
+
+    // Записываем скрипт во временный файл
+    let temp_script = std::env::temp_dir().join("yt_info.py");
+    std::fs::write(&temp_script, python_script).map_err(|e| e.to_string())?;
+
+    // Запускаем Python скрипт с скрытым окном и UTF-8 кодировкой
+    let mut cmd = Command::new("python");
+    cmd.arg(temp_script.to_str().unwrap())
+        .arg(&url)
+        .env("PYTHONIOENCODING", "utf-8")
+        .env("PYTHONUTF8", "1")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    
+    let output = cmd.output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+
+    // Декодируем вывод как UTF-8
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    if !stderr.is_empty() && output.status.code() != Some(0) {
+        return Err(format!("Python error: {}", stderr));
+    }
+
+    // Удаляем временный файл
+    let _ = std::fs::remove_file(temp_script);
+
+    Ok(stdout.trim().to_string())
+}
+
+// Команда для начала загрузки
+#[tauri::command]
+fn start_download(
+    window: Window,
+    url: String,
+    quality: String,
+    format_type: String,
+    save_path: String,
+) -> Result<String, String> {
+    // Находим путь к ffmpeg относительно исполняемого файла
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    
+    // Проверяем несколько возможных расположений ffmpeg
+    let ffmpeg_paths = [
+        exe_dir.join("ffmpeg").join("bin").join("ffmpeg.exe"),
+        exe_dir.join("ffmpeg").join("ffmpeg.exe"),
+        exe_dir.join("app").join("ffmpeg").join("bin").join("ffmpeg.exe"),
+        std::path::PathBuf::from(r"C:\ffmpeg\bin\ffmpeg.exe"),
+    ];
+    
+    // yt-dlp требует ДИРЕКТОРИЮ, а не путь к файлу
+    let ffmpeg_location = ffmpeg_paths.iter()
+        .find(|p| p.exists())
+        .and_then(|p| p.parent())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    
+    let python_script = r#"
+import sys
+import json
+import os
+import yt_dlp
+
+# Принудительно устанавливаем UTF-8 кодировку для stdout
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
+
+def find_ffmpeg(ffmpeg_arg=None):
+    # Сначала проверяем путь, переданный из Rust (это ДИРЕКТОРИЯ)
+    if ffmpeg_arg and os.path.isdir(ffmpeg_arg):
+        candidate = os.path.join(ffmpeg_arg, 'ffmpeg.exe')
+        if os.path.exists(candidate):
+            return ffmpeg_arg  # возвращаем директорию
+        # Может быть передан полный путь к файлу
+    if ffmpeg_arg and os.path.isfile(ffmpeg_arg):
+        return os.path.dirname(ffmpeg_arg)  # возвращаем директорию
+    
+    possible_dirs = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg', 'bin'),
+        os.path.join(os.path.dirname(sys.executable), 'ffmpeg', 'bin'),
+        os.path.join(os.getcwd(), 'ffmpeg', 'bin'),
+        os.path.join(os.getcwd(), 'app', 'ffmpeg', 'bin'),
+        os.path.join(os.getcwd(), 'ffmpeg'),
+        os.path.dirname(sys.executable),
+        r'C:\ffmpeg\bin',
+    ]
+    
+    for d in possible_dirs:
+        if os.path.exists(os.path.join(d, 'ffmpeg.exe')):
+            return d
+    
+    # Проверяем PATH
+    import shutil
+    ffmpeg_in_path = shutil.which('ffmpeg')
+    if ffmpeg_in_path:
+        return os.path.dirname(ffmpeg_in_path)
+    
+    return None
+
+def progress_hook(d):
+    if d['status'] == 'downloading':
+        total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+        downloaded = d.get('downloaded_bytes', 0)
+        progress = (downloaded / total * 100) if total > 0 else 0
+        speed = d.get('speed', 0) or 0
+        eta = d.get('eta', 0) or 0
+        
+        data = {
+            'type': 'progress',
+            'progress': round(progress, 2),
+            'speed': speed,
+            'eta': eta,
+            'downloaded': downloaded,
+            'total': total
+        }
+        print(json.dumps(data, ensure_ascii=False), flush=True)
+    
+    elif d['status'] == 'finished':
+        data = {'type': 'finished', 'filename': d.get('filename', '')}
+        print(json.dumps(data, ensure_ascii=False), flush=True)
+
+def download(url, quality, format_type, save_path, ffmpeg_arg=None):
+    ffmpeg_dir = find_ffmpeg(ffmpeg_arg)
+    has_ffmpeg = ffmpeg_dir is not None and os.path.exists(os.path.join(ffmpeg_dir, 'ffmpeg.exe'))
+    
+    # Определяем формат
+    if format_type == 'audio':
+        format_string = 'bestaudio/best'
+    elif quality == 'best':
+        if has_ffmpeg:
+            format_string = 'bestvideo+bestaudio/best'
+        else:
+            format_string = 'best'
+    else:
+        height = int(quality.replace('p', ''))
+        if has_ffmpeg:
+            format_string = f'bestvideo[height<={height}]+bestaudio[ext=m4a]/bestvideo[height<={height}]+bestaudio/best'
+        else:
+            format_string = f'best[height<={height}]/best'
+    
+    # Шаблон имени файла
+    output_template = os.path.join(save_path, '%(title)s.%(ext)s')
+    
+    ydl_opts = {
+        'format': format_string,
+        'outtmpl': output_template,
+        'progress_hooks': [progress_hook],
+    }
+    
+    if has_ffmpeg:
+        ydl_opts['ffmpeg_location'] = ffmpeg_dir
+        ydl_opts['merge_output_format'] = 'mp4'
+    
+    if format_type == 'audio':
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '320',
+        }]
+    elif has_ffmpeg:
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }]
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+            
+            if format_type == 'audio':
+                filename = os.path.splitext(filename)[0] + '.mp3'
+            
+            result = {
+                'type': 'complete',
+                'success': True,
+                'filename': filename,
+                'title': info.get('title', 'Unknown')
+            }
+            print(json.dumps(result, ensure_ascii=False), flush=True)
+            return 0
+    except Exception as e:
+        result = {
+            'type': 'error',
+            'success': False,
+            'error': str(e)
+        }
+        print(json.dumps(result, ensure_ascii=False), flush=True)
+        return 1
+
+if __name__ == '__main__':
+    url = sys.argv[1]
+    quality = sys.argv[2]
+    format_type = sys.argv[3]
+    save_path = sys.argv[4]
+    ffmpeg_arg = sys.argv[5] if len(sys.argv) > 5 else None
+    sys.exit(download(url, quality, format_type, save_path, ffmpeg_arg))
+"#;
+
+    // Записываем скрипт во временный файл
+    let temp_script = std::env::temp_dir().join("yt_download.py");
+    std::fs::write(&temp_script, python_script).map_err(|e| e.to_string())?;
+
+    // Запускаем Python скрипт с выводом в реальном времени и скрытым окном
+    let mut cmd = Command::new("python");
+    cmd.arg(temp_script.to_str().unwrap())
+        .arg(&url)
+        .arg(&quality)
+        .arg(&format_type)
+        .arg(&save_path)
+        .arg(&ffmpeg_location)
+        .env("PYTHONIOENCODING", "utf-8")
+        .env("PYTHONUTF8", "1")
+        .env("PATH", format!("{};{}", ffmpeg_location, std::env::var("PATH").unwrap_or_default()))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    
+    let mut child = cmd.spawn()
+        .map_err(|e| format!("Failed to start Python: {}", e))?;
+
+    // Читаем вывод в реальном времени
+    if let Some(stdout) = child.stdout.take() {
+        let reader = BufReader::new(stdout);
+        let window_clone = window.clone();
+        
+        thread::spawn(move || {
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    // Отправляем прогресс в frontend
+                    let _ = window_clone.emit("download-progress", &line);
+                }
+            }
+        });
+    }
+
+    // Ждём завершения
+    let status = child.wait().map_err(|e| e.to_string())?;
+
+    // Удаляем временный файл
+    let _ = std::fs::remove_file(temp_script);
+
+    if status.success() {
+        Ok("Download started".to_string())
+    } else {
+        Err("Download failed".to_string())
+    }
+}
+
+// Команда для отмены загрузки
+#[tauri::command]
+fn cancel_download() -> Result<String, String> {
+    // В реальной реализации нужно убить Python процесс
+    Ok("Cancelled".to_string())
+}
+
+// Команда для выбора папки сохранения
+#[tauri::command]
+async fn select_folder(window: Window) -> Result<String, String> {
+    use tauri::api::dialog::blocking::FileDialogBuilder;
+    
+    let folder = FileDialogBuilder::new()
+        .set_title("Select download folder")
+        .pick_folder();
+    
+    match folder {
+        Some(path) => Ok(path.to_string_lossy().to_string()),
+        None => Err("No folder selected".to_string()),
+    }
+}
+
+fn main() {
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            get_video_info,
+            start_download,
+            cancel_download,
+            select_folder,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

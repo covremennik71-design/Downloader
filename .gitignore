@@ -1,0 +1,60 @@
+# Rust
+src-tauri/target/
+app/src-tauri/target/
+**/*.rs.bk
+*.pdb
+
+# Tauri
+app/src-tauri/WixTools/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+downloads/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# FFmpeg
+ffmpeg.zip
+ffmpeg/temp/
+ffmpeg/ffmpeg-master-*/
+
+# Logs
+*.log
+
+# Temp files
+*.tmp
+*.temp
+
+# Build artifacts
+build/
+*.exe
+ffmpeg/bin/
+app/ffmpeg/bin/
