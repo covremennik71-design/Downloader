@@ -21,7 +21,7 @@ fn terminate_download_process(child: &mut std::process::Child) -> Result<(), Str
         let pid = child.id().to_string();
         let mut taskkill = Command::new("taskkill");
         taskkill
-            .args(["/PID", &pid, "/T", "/F"])
+            .args(["/PID", pid.as_str(), "/T", "/F"])
             .stdout(Stdio::null())
             .stderr(Stdio::null());
         taskkill.creation_flags(CREATE_NO_WINDOW);
