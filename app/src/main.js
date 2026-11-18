@@ -8,6 +8,7 @@ let videoInfo = null;
 let selectedQuality = null;
 let selectedFormat = 'video';
 let isDownloading = false;
+let infoRequestSequence = 0;
 let config = {
     apiKey: '',
     defaultPath: 'downloads',
@@ -40,6 +41,10 @@ const successMessage = document.getElementById('successMessage');
 const newDownloadBtn = document.getElementById('newDownloadBtn');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsModal = document.getElementById('settingsModal');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const defaultPathInput = document.getElementById('defaultPathInput');
+const defaultQualitySelect = document.getElementById('defaultQualitySelect');
+const browseDefaultBtn = document.getElementById('browseDefaultBtn');
 const closeSettingsModal = document.getElementById('closeSettingsModal');
 const cancelSettings = document.getElementById('cancelSettings');
 const saveSettings = document.getElementById('saveSettings');
@@ -67,9 +72,12 @@ function setupEventListeners() {
     });
 
     urlInput.addEventListener('input', () => {
+        infoRequestSequence += 1;
         videoInfo = null;
         selectedQuality = null;
         videoInfoSection.style.display = 'none';
+        showLoading(false);
+        getInfoBtn.disabled = false;
     });
 
     // Get info button
@@ -105,7 +113,20 @@ function setupEventListeners() {
     newDownloadBtn.addEventListener('click', resetUI);
 
     // Settings
-    settingsBtn.addEventListener('click', () => settingsModal.classList.add('active'));
+    settingsBtn.addEventListener('click', () => {
+        apiKeyInput.value = config.apiKey || '';
+        defaultPathInput.value = config.defaultPath || 'downloads';
+        defaultQualitySelect.value = config.defaultQuality || '1080p';
+        settingsModal.classList.add('active');
+    });
+    browseDefaultBtn.addEventListener('click', async () => {
+        try {
+            const folder = await invoke('select_folder');
+            if (folder) defaultPathInput.value = folder;
+        } catch (err) {
+            console.error('Failed to select default folder:', err);
+        }
+    });
     closeSettingsModal.addEventListener('click', () => settingsModal.classList.remove('active'));
     cancelSettings.addEventListener('click', () => settingsModal.classList.remove('active'));
     saveSettings.addEventListener('click', handleSaveSettings);
@@ -131,7 +152,9 @@ async function setupProgressListener() {
             } else if (data.type === 'complete') {
                 handleDownloadComplete(data);
             } else if (data.type === 'error') {
-                handleDownloadError(data.error);
+                // The invoke promise reports the process exit as a rejection.
+                // Do not show a second alert for the same failure event.
+                console.error('Downloader process error:', data.error);
             }
         } catch (err) {
             console.error('Failed to parse progress:', err);
@@ -152,16 +175,15 @@ function loadConfig() {
             localStorage.setItem('downloader_config', JSON.stringify(config));
         }
         savePathInput.value = config.defaultPath || 'downloads';
+        if (apiKeyInput) apiKeyInput.value = config.apiKey || '';
+        if (defaultPathInput) defaultPathInput.value = config.defaultPath || 'downloads';
+        if (defaultQualitySelect) defaultQualitySelect.value = config.defaultQuality || '1080p';
     } catch (err) {
         console.error('Failed to load config:', err);
     }
 }
 
 function handleSaveSettings() {
-    const apiKeyInput = document.getElementById('apiKeyInput');
-    const defaultPathInput = document.getElementById('defaultPathInput');
-    const defaultQualitySelect = document.getElementById('defaultQualitySelect');
-
     config.apiKey = apiKeyInput.value;
     config.defaultPath = defaultPathInput.value || config.defaultPath;
     config.defaultQuality = defaultQualitySelect.value;
@@ -186,12 +208,14 @@ async function handleGetInfo() {
         return;
     }
     urlInput.value = normalizedUrl;
+    const requestId = ++infoRequestSequence;
 
     showLoading(true);
     getInfoBtn.disabled = true;
 
     try {
         const result = await invoke('get_video_info', { url: normalizedUrl });
+        if (requestId !== infoRequestSequence) return;
         videoInfo = JSON.parse(result);
         
         if (videoInfo.error) {
@@ -201,24 +225,24 @@ async function handleGetInfo() {
         displayVideoInfo(videoInfo);
         videoInfoSection.style.display = 'block';
     } catch (err) {
-        console.error('Failed to get video info:', err);
-        alert('Failed to get video info: ' + err.message);
+        if (requestId === infoRequestSequence) {
+            console.error('Failed to get video info:', err);
+            alert('Failed to get video info: ' + err.message);
+        }
     } finally {
-        showLoading(false);
-        getInfoBtn.disabled = false;
+        if (requestId === infoRequestSequence) {
+            showLoading(false);
+            getInfoBtn.disabled = false;
+        }
     }
 }
 
 function displayVideoInfo(info) {
     // Thumbnail
-    if (info.thumbnail) {
-        videoThumbnail.src = info.thumbnail;
-    }
+    videoThumbnail.src = info.thumbnail || '';
+    videoDuration.textContent = info.duration ? formatDuration(info.duration) : '0:00';
 
     // Duration
-    if (info.duration) {
-        videoDuration.textContent = formatDuration(info.duration);
-    }
 
     // Title
     videoTitle.textContent = info.title || 'Unknown Title';
@@ -227,9 +251,7 @@ function displayVideoInfo(info) {
     videoUploader.textContent = info.uploader || 'Unknown Channel';
 
     // Views
-    if (info.view_count) {
-        videoViews.textContent = formatViews(info.view_count) + ' views';
-    }
+    videoViews.textContent = info.view_count ? formatViews(info.view_count) + ' views' : '0 views';
 
     // Render quality options
     renderQualityOptions();
