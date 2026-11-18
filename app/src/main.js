@@ -9,6 +9,9 @@ let selectedQuality = null;
 let selectedFormat = 'video';
 let isDownloading = false;
 let infoRequestSequence = 0;
+let activeDownloadPromise = null;
+let cancelCommandPromise = null;
+let cancelRequested = false;
 let config = {
     apiKey: '',
     defaultPath: 'downloads',
@@ -147,6 +150,9 @@ function setupEventListeners() {
 
 // ===== Progress Listener =====
 async function setupProgressListener() {
+    await listen('download-started', () => {
+        if (isDownloading) cancelBtn.disabled = false;
+    });
     await listen('download-progress', (event) => {
         try {
             const data = JSON.parse(event.payload);
@@ -384,25 +390,36 @@ async function handleDownload() {
     }
 
     isDownloading = true;
+    cancelRequested = false;
+    cancelCommandPromise = null;
     videoInfoSection.style.display = 'none';
     progressSection.style.display = 'block';
     downloadBtn.disabled = true;
+    cancelBtn.disabled = true;
 
+    const downloadPromise = invoke('start_download', {
+        url: urlInput.value.trim(),
+        quality: selectedQuality,
+        formatType: selectedFormat,
+        savePath: savePath
+    });
+    activeDownloadPromise = downloadPromise;
     try {
-        await invoke('start_download', {
-            url: urlInput.value.trim(),
-            quality: selectedQuality,
-            formatType: selectedFormat,
-            savePath: savePath
-        });
-        // The final stdout event is asynchronous; the command result is a fallback
-        // so a delayed/missed event cannot leave the UI stuck in the progress state.
+        await downloadPromise;
+        if (cancelCommandPromise) await cancelCommandPromise.catch(() => null);
+        // The final stdout event is asynchronous; the command result is a fallback.
         if (isDownloading) {
-            handleDownloadComplete({ title: videoInfo?.title || 'Video' });
+            if (cancelRequested) handleDownloadCancelled();
+            else handleDownloadComplete({ title: videoInfo?.title || 'Video' });
         }
     } catch (err) {
+        if (cancelCommandPromise) await cancelCommandPromise.catch(() => null);
         console.error('Download failed:', err);
-        handleDownloadError(err);
+        if (cancelRequested && isDownloading) handleDownloadCancelled();
+        else handleDownloadError(err);
+    } finally {
+        if (activeDownloadPromise === downloadPromise) activeDownloadPromise = null;
+        cancelCommandPromise = null;
     }
 }
 
@@ -428,8 +445,9 @@ function updateProgress(data) {
 }
 
 function handleDownloadComplete(data) {
-    if (!isDownloading) return;
+    if (!isDownloading || cancelRequested || cancelCommandPromise) return;
     isDownloading = false;
+    cancelBtn.disabled = true;
     progressSection.style.display = 'none';
     successSection.style.display = 'block';
     successMessage.textContent = `"${data.title}" successfully downloaded!`;
@@ -440,18 +458,34 @@ function handleDownloadError(error) {
     progressSection.style.display = 'none';
     videoInfoSection.style.display = 'block';
     downloadBtn.disabled = false;
+    cancelBtn.disabled = true;
     alert('Download failed: ' + error);
 }
 
+function handleDownloadCancelled() {
+    if (!isDownloading) return;
+    isDownloading = false;
+    cancelRequested = false;
+    cancelBtn.disabled = true;
+    progressSection.style.display = 'none';
+    videoInfoSection.style.display = 'block';
+    downloadBtn.disabled = false;
+}
+
 async function handleCancel() {
+    if (!isDownloading || cancelBtn.disabled || !activeDownloadPromise) return;
+    cancelBtn.disabled = true;
+    const request = invoke('cancel_download');
+    cancelCommandPromise = request;
     try {
-        await invoke('cancel_download');
-        isDownloading = false;
-        progressSection.style.display = 'none';
-        videoInfoSection.style.display = 'block';
-        downloadBtn.disabled = false;
+        const result = await request;
+        cancelRequested = result === 'Cancellation requested';
+        if (activeDownloadPromise) await activeDownloadPromise.catch(() => {});
+        if (cancelRequested && isDownloading) handleDownloadCancelled();
     } catch (err) {
         console.error('Failed to cancel:', err);
+        cancelRequested = false;
+        if (isDownloading) cancelBtn.disabled = false;
     }
 }
 
