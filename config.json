@@ -1,6 +1,6 @@
 {
     "youtube_api_key": "",
-    "download_path": "C:\\Users\\Smixr\\Videos\\YouTube",
+    "download_path": "downloads",
     "theme": "dark",
     "video_format": "mp4",
     "audio_format": "mp3",
