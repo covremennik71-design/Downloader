@@ -186,7 +186,7 @@ async function handleGetInfo() {
     getInfoBtn.disabled = true;
 
     try {
-        const result = await invoke('get_video_info', { url });
+        const result = await invoke('get_video_info', { url: normalizedUrl });
         videoInfo = JSON.parse(result);
         
         if (videoInfo.error) {

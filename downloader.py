@@ -437,6 +437,7 @@ class DownloaderApp(ctk.CTk):
             font=ctk.CTkFont(size=13)
         )
         self.url_entry.pack(fill="x", pady=(0, 5))
+        self.url_entry.bind("<KeyRelease>", self._invalidate_video_info)
         
         # ===== Информация о видео =====
         self.info_frame = ctk.CTkFrame(main_frame, corner_radius=10)
@@ -618,6 +619,10 @@ class DownloaderApp(ctk.CTk):
             self.config["download_path"] = folder
             save_config(self.config)
     
+    def _invalidate_video_info(self, _event=None):
+        """Сбросить метаданные, если пользователь изменил ссылку."""
+        self.current_info = None
+
     def get_info(self):
         """Получить информацию о видео."""
         url = self.url_entry.get().strip()
