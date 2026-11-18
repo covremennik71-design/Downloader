@@ -478,12 +478,17 @@ if __name__ == '__main__':
 fn cancel_download(state: tauri::State<'_, DownloadState>) -> Result<String, String> {
     let mut active = state.active_child.lock().map_err(|e| e.to_string())?;
     match active.as_mut() {
-        Some(child) => {
-            state.cancel_requested.store(true, Ordering::SeqCst);
-            terminate_download_process(child)?;
-            Ok("Cancellation requested".to_string())
-        }
-        None => Err("No active download".to_string()),
+        Some(child) => match child.try_wait() {
+            Ok(Some(_)) => Ok("Download has already finished".to_string()),
+            Ok(None) => {
+                state.cancel_requested.store(true, Ordering::SeqCst);
+                terminate_download_process(child)?;
+                Ok("Cancellation requested".to_string())
+            }
+            Err(error) => Err(format!("Failed to inspect download process: {}", error)),
+        },
+        // The completion event may arrive just before the UI's cancel click.
+        None => Ok("No active download".to_string()),
     }
 }
 
