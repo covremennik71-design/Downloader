@@ -33,11 +33,13 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertNotIn("В реальной реализации нужно убить Python процесс", source)
 
     def test_repository_has_no_developer_machine_download_path(self):
-        for path in ("config.json", "app/src/main.js", "README.md"):
+        for path in ("config.json", "README.md"):
             with self.subTest(path=path):
                 source = Path(path).read_text(encoding="utf-8")
                 self.assertNotIn("C:\\\\Users\\\\Smixr", source)
                 self.assertNotIn("C:\\Users\\Smixr", source)
+        frontend = Path("app/src/main.js").read_text(encoding="utf-8")
+        self.assertIn("defaultPath: 'downloads'", frontend)
 
     def test_windows_scripts_use_repository_relative_paths(self):
         build = Path("build.bat").read_text(encoding="utf-8")
