@@ -708,8 +708,7 @@ class DownloaderApp(ctk.CTk):
         except ValueError as exc:
             messagebox.showwarning("Ошибка", str(exc))
             return
-        if self.current_info is None:
-            # Получаем информацию для текущего нормализованного URL.
+        # Если метаданные ещё не получены — получаем их для нормализованного URL.
         if self.current_info is None:
             self.status_label.configure(text="Получение информации о видео...", text_color="orange")
             self.download_btn.configure(state="disabled")
