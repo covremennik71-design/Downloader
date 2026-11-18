@@ -301,7 +301,7 @@ def progress_hook(d):
         data = {'type': 'finished', 'filename': d.get('filename', '')}
         print(json.dumps(data, ensure_ascii=False), flush=True)
 
-def download(url, quality, format_type, save_path, ffmpeg_arg=None):
+def _download_impl(url, quality, format_type, save_path, ffmpeg_arg=None):
     url = normalize_youtube_url(url)
     save_path = os.path.abspath(os.path.expanduser(save_path))
     os.makedirs(save_path, exist_ok=True)
@@ -363,6 +363,7 @@ def download(url, quality, format_type, save_path, ffmpeg_arg=None):
             base_filename = os.path.splitext(prepared_filename)[0]
             candidates = [
                 info.get('filepath'),
+                prepared_filename,
                 base_filename + ('.mp3' if format_type == 'audio' else '.mp4'),
                 base_filename + '.mkv',
                 base_filename + '.webm',
@@ -392,6 +393,17 @@ def download(url, quality, format_type, save_path, ffmpeg_arg=None):
             'error': str(e)
         }
         print(json.dumps(result, ensure_ascii=False), flush=True)
+        return 1
+
+def download(url, quality, format_type, save_path, ffmpeg_arg=None):
+    try:
+        return _download_impl(url, quality, format_type, save_path, ffmpeg_arg)
+    except Exception as e:
+        print(json.dumps({
+            'type': 'error',
+            'success': False,
+            'error': str(e)
+        }), flush=True)
         return 1
 
 if __name__ == '__main__':
