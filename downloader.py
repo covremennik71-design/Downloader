@@ -120,6 +120,8 @@ def load_config():
         save_config(config)
 
     configured_path = config.get("download_path") or DOWNLOADS_DIR
+    if not isinstance(configured_path, str):
+        configured_path = DOWNLOADS_DIR
     if not os.path.isabs(configured_path):
         configured_path = os.path.join(BASE_DIR, configured_path)
     config["download_path"] = os.path.normpath(configured_path)
@@ -255,7 +257,6 @@ class YouTubeDownloader:
         import yt_dlp
         
         self.is_downloading = True
-        self.cancel_flag = False
         
         def progress_hook(d):
             if self.cancel_flag:
@@ -396,6 +397,7 @@ class DownloaderApp(ctk.CTk):
         self.config = load_config()
         self.downloader = YouTubeDownloader(self.config)
         self.current_info = None
+        self.current_info_url = None
         
         # Настройки окна
         self.title("YouTube Downloader")
@@ -614,14 +616,8 @@ class DownloaderApp(ctk.CTk):
             print(f"[APP] FFmpeg found: {ffmpeg}")
     
     def check_api_key(self):
-        """Проверить наличие API ключа."""
-        api_key = self.config.get("youtube_api_key", "")
-        if not api_key or api_key == "ВСТАВЬТЕ_СЮДА_ВАШ_YOUTUBE_API_KEY":
-            self.api_label.configure(
-                text="⚠️ YouTube API ключ не указан (нажмите Настройки)"
-            )
-        else:
-            self.api_label.configure(text="✅ YouTube API ключ настроен")
+        """Explain that yt-dlp downloads do not require a YouTube Data API key."""
+        self.api_label.configure(text="YouTube Data API key is not required for downloads")
     
     def browse_folder(self):
         """Выбрать папку для сохранения."""
@@ -638,6 +634,7 @@ class DownloaderApp(ctk.CTk):
     def _invalidate_video_info(self, _event=None):
         """Сбросить метаданные, если пользователь изменил ссылку."""
         self.current_info = None
+        self.current_info_url = None
 
     def get_info(self):
         """Получить информацию о видео."""
@@ -654,6 +651,7 @@ class DownloaderApp(ctk.CTk):
             messagebox.showwarning("Ошибка", str(exc))
             return
         self.current_info = None
+        self.current_info_url = None
         self.status_label.configure(text="Получение информации...", text_color="orange")
         self.get_info_btn.configure(state="disabled")
         
@@ -682,7 +680,7 @@ class DownloaderApp(ctk.CTk):
             self.after(0, lambda: self._show_info(info_text, info, qualities, url))
             
         except Exception as e:
-            self.after(0, lambda: self._show_error(str(e)))
+            self.after(0, lambda: self._show_error(str(e), requested_url=url))
     
     def _apply_qualities(self, qualities):
         """Apply quality choices on the Tk main thread."""
@@ -700,14 +698,19 @@ class DownloaderApp(ctk.CTk):
             self.get_info_btn.configure(state="normal")
             return
         self.current_info = info
+        self.current_info_url = requested_url
         self._apply_qualities(qualities)
         self.info_label.configure(text=text)
         self.info_frame.pack(fill="x", pady=10)
         self.status_label.configure(text="Информация получена", text_color="green")
         self.get_info_btn.configure(state="normal")
     
-    def _show_error(self, error):
-        """Показать ошибку."""
+    def _show_error(self, error, requested_url=None):
+        """Показать ошибку только для актуального запроса."""
+        if requested_url and self.url_entry.get().strip() != requested_url:
+            self.download_btn.configure(state="normal")
+            self.get_info_btn.configure(state="normal")
+            return
         self.status_label.configure(text=f"Ошибка: {error[:100]}", text_color="red")
         self.download_btn.configure(state="normal")
         self.cancel_btn.configure(state="disabled")
@@ -732,7 +735,9 @@ class DownloaderApp(ctk.CTk):
             messagebox.showwarning("Ошибка", str(exc))
             return
         # Если метаданные ещё не получены — получаем их для нормализованного URL.
-        if self.current_info is None:
+        if self.current_info is None or self.current_info_url != url:
+            self.current_info = None
+            self.current_info_url = None
             self.status_label.configure(text="Получение информации о видео...", text_color="orange")
             self.download_btn.configure(state="disabled")
             self.get_info_btn.configure(state="disabled")
@@ -765,7 +770,7 @@ class DownloaderApp(ctk.CTk):
             self.after(0, lambda: self._show_info_and_dialog(info_text, info, qualities, url))
             
         except Exception as e:
-            self.after(0, lambda: self._show_error(str(e)))
+            self.after(0, lambda: self._show_error(str(e), requested_url=url))
     
     def _show_info_and_dialog(self, info_text, info, qualities, requested_url):
         """Показать информацию и диалог выбора качества на главном потоке Tk."""
@@ -774,6 +779,7 @@ class DownloaderApp(ctk.CTk):
             self.get_info_btn.configure(state="normal")
             return
         self.current_info = info
+        self.current_info_url = requested_url
         self._apply_qualities(qualities)
         self.info_label.configure(text=info_text)
         self.info_frame.pack(fill="x", pady=10)
@@ -896,7 +902,15 @@ class DownloaderApp(ctk.CTk):
         
         # Проверяем наличие FFmpeg
         ffmpeg = find_ffmpeg()
-        if not ffmpeg and quality != 'Только аудио (MP3)':
+        if not ffmpeg and quality == 'Только аудио (MP3)':
+            messagebox.showerror(
+                "FFmpeg не найден",
+                "Для извлечения аудио в MP3 необходим FFmpeg. Установите FFmpeg и повторите попытку."
+            )
+            self.download_btn.configure(state="normal")
+            return
+
+        if not ffmpeg:
             result = messagebox.askyesno(
                 "FFmpeg не найден",
                 "FFmpeg не найден! Видео будет скачано БЕЗ ЗВУКА.\n\n"
@@ -929,6 +943,8 @@ class DownloaderApp(ctk.CTk):
         self.progress_label.configure(text="Подготовка...")
         
         # Запускаем загрузку в потоке
+        # Reset before the worker starts so an immediate cancel click is not lost.
+        self.downloader.cancel_flag = False
         thread = threading.Thread(
             target=self.downloader.download,
             args=(url, quality, save_path),
