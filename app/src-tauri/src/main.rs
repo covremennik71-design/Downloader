@@ -306,8 +306,16 @@ def download(url, quality, format_type, save_path, ffmpeg_arg=None):
     save_path = os.path.abspath(os.path.expanduser(save_path))
     os.makedirs(save_path, exist_ok=True)
     ffmpeg_dir = find_ffmpeg(ffmpeg_arg)
-    has_ffmpeg = ffmpeg_dir is not None and os.path.exists(os.path.join(ffmpeg_dir, 'ffmpeg.exe'))
-    
+    has_ffmpeg = ffmpeg_dir is not None and os.path.isfile(os.path.join(ffmpeg_dir, 'ffmpeg.exe'))
+
+    if format_type not in ('video', 'audio'):
+        raise ValueError('Unsupported download format')
+    if format_type == 'audio' and not has_ffmpeg:
+        raise RuntimeError('FFmpeg is required to extract audio as MP3')
+    if format_type == 'video' and quality != 'best':
+        if not quality.endswith('p') or not quality[:-1].isdigit():
+            raise ValueError('Unsupported video quality')
+
     # Определяем формат
     if format_type == 'audio':
         format_string = 'bestaudio/best'
@@ -351,11 +359,24 @@ def download(url, quality, format_type, save_path, ffmpeg_arg=None):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            
-            if format_type == 'audio':
-                filename = os.path.splitext(filename)[0] + '.mp3'
-            
+            prepared_filename = ydl.prepare_filename(info)
+            base_filename = os.path.splitext(prepared_filename)[0]
+            candidates = [
+                info.get('filepath'),
+                base_filename + ('.mp3' if format_type == 'audio' else '.mp4'),
+                base_filename + '.mkv',
+                base_filename + '.webm',
+                base_filename + '.m4a',
+            ]
+            filename = next(
+                (candidate for candidate in candidates if candidate and os.path.isfile(candidate)),
+                None
+            )
+            if filename is None:
+                raise FileNotFoundError(
+                    'yt-dlp finished but the expected output file was not found'
+                )
+
             result = {
                 'type': 'complete',
                 'success': True,
