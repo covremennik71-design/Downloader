@@ -1,231 +1,100 @@
-# 📥 Инструкция по установке зависимостей
+# Установка и запуск Downloader
 
-## Шаг 1: Установка Python
+Эта инструкция соответствует текущей структуре репозитория.
 
-### Windows
+## Требования
 
-1. Перейдите на https://python.org/downloads/
-2. Скачайте последнюю версию Python (3.11+)
-3. Запустите установщик
-4. **ВАЖНО:** Отметьте галочку "Add Python to PATH"
-5. Нажмите "Install Now"
+- Windows 10/11.
+- Python 3.10 или новее, добавленный в PATH.
+- Rust toolchain через https://rustup.rs — для Tauri.
+- WebView2 Runtime.
+- Visual Studio Build Tools с компонентом «Разработка классических приложений на C++» — для сборки Rust/Tauri.
+- FFmpeg — необязателен для базовой загрузки, но нужен для объединения отдельных потоков и конвертации в MP3.
 
-### Проверка установки
+## Подготовка
 
-Откройте командную строку (cmd) и выполните:
-```bash
+Откройте терминал в корневой папке репозитория — там, где находятся `build.bat`, `dev.bat` и `requirements.txt`.
+
+```bat
 python --version
-```
-
-Должно вывести: `Python 3.11.x` или выше
-
----
-
-## Шаг 2: Установка Rust
-
-### Windows
-
-1. Перейдите на https://rustup.rs
-2. Скачайте `rustup-init.exe`
-3. Запустите файл
-4. Следуйте инструкциям (нажмите Enter для выбора по умолчанию)
-5. После установки перезапустите командную строку
-
-### Проверка установки
-
-```bash
-rustc --version
-```
-
-Должно вывести: `rustc 1.70.0` или выше
-
----
-
-## Шаг 3: Установка WebView2 (если необходимо)
-
-WebView2 обычно уже установлен в Windows 10/11.
-
-### Проверка
-
-1. Откройте "Параметры" → "Приложения"
-2. Найдите "Microsoft Edge WebView2 Runtime"
-
-### Если не установлен
-
-1. Перейдите на https://developer.microsoft.com/en-us/microsoft-edge/webview2/
-2. Скачайте "Evergreen Bootstrapper"
-3. Запустите установщик
-
----
-
-## Шаг 4: Установка Visual Studio Build Tools (для Rust)
-
-### Windows
-
-1. Перейдите на https://visualstudio.microsoft.com/visual-cpp-build-tools/
-2. Скачайте "Build Tools for Visual Studio 2022"
-3. Запустите установщик
-4. Выберите "Разработка классических приложений на C++"
-5. Убедитесь, что выбраны:
-   - MSVC v143 build tools
-   - Windows 10/11 SDK
-6. Нажмите "Установить"
-
----
-
-## Шаг 5: Установка Node.js (опционально)
-
-Node.js не обязателен, но может понадобиться для некоторых Tauri функций.
-
-### Windows
-
-1. Перейдите на https://nodejs.org/
-2. Скачайте LTS версию
-3. Запустите установщик
-4. Используйте настройки по умолчанию
-
-### Проверка
-
-```bash
-node --version
-npm --version
-```
-
----
-
-## Шаг 6: Установка Python зависимостей
-
-Откройте командную строку в папке проекта:
-
-```bash
-cd C:\Users\Smixr\Desktop\Downloader
-pip install yt-dlp
-```
-
----
-
-## Шаг 7: Установка Tauri CLI
-
-```bash
+python -m pip install -r requirements.txt
 cargo install tauri-cli --version "^1.6"
 ```
 
-Это может занять несколько минут.
+Для установки FFmpeg запустите:
 
----
+```bat
+download_ffmpeg.bat
+```
 
-## Шаг 8: Запуск приложения
+Скрипт сохраняет FFmpeg в `ffmpeg\bin\`. При сборке `build.bat` копирует его в каталог Tauri и рядом с результирующим EXE.
 
-### Режим разработки
+## Запуск Python GUI
 
-```bash
+```bat
+run.bat
+```
+
+Либо вручную:
+
+```bat
+python -m pip install -r requirements.txt
+python downloader.py
+```
+
+## Запуск Tauri в режиме разработки
+
+Из корня репозитория:
+
+```bat
 dev.bat
 ```
 
-### Сборка EXE
+Скрипт сам переходит в `app\src-tauri\`.
 
-```bash
+## Сборка Tauri EXE
+
+Из корня репозитория:
+
+```bat
 build.bat
 ```
 
----
+Результат: `YouTube Downloader.exe` в корне проекта.
 
-## 🔧 Решение проблем
+**Важно:** текущая сборка Tauri не является полностью автономным установщиком. На целевом компьютере должны быть доступны Python и пакет `yt-dlp`. FFmpeg требуется для объединения отдельных видео- и аудиопотоков и MP3-конвертации. Скрипт сборки проверяет окружение сборочной машины, но не упаковывает системный Python в EXE.
 
-### Ошибка: "python is not recognized"
+## Типичные проблемы
 
-**Решение:**
-1. Переустановите Python
-2. Обязательно отметьте "Add Python to PATH"
-3. Или добавьте Python в PATH вручную:
-   - "Параметры" → "Система" → "О системе" → "Дополнительные параметры системы"
-   - "Переменные среды" → "Path" → "Изменить"
-   - Добавьте: `C:\Users\ВашеИмя\AppData\Local\Programs\Python\Python311\Scripts\`
-   - Добавьте: `C:\Users\ВашеИмя\AppData\Local\Programs\Python\Python311\`
+### Python не найден
+Переустановите Python и включите опцию `Add Python to PATH`. Убедитесь, что `python --version` выполняется из нового терминала.
 
-### Ошибка: "rustc is not recognized"
+### Rust или Cargo не найден
+Установите Rust с https://rustup.rs и перезапустите терминал.
 
-**Решение:**
-1. Перезапустите командную строку
-2. Если не помогло, добавьте Rust в PATH:
-   - Добавьте: `C:\Users\ВашеИмя\.cargo\bin\`
+### Не найден WebView2
+Установите WebView2 Runtime: https://developer.microsoft.com/en-us/microsoft-edge/webview2/
 
-### Ошибка: "linker 'link.exe' not found"
+### Не найден компилятор Windows
+Установите Visual Studio Build Tools и компонент «Разработка классических приложений на C++».
 
-**Решение:**
-1. Установите Visual Studio Build Tools
-2. Выберите "Разработка классических приложений на C++"
+### Не найден FFmpeg
+Запустите `download_ffmpeg.bat` и проверьте наличие `ffmpeg\bin\ffmpeg.exe`. Без FFmpeg часть вариантов качества и MP3-конвертация недоступны.
 
-### Ошибка: "WebView2 not found"
-
-**Решение:**
-1. Установите WebView2 Runtime
-2. Скачайте с https://developer.microsoft.com/en-us/microsoft-edge/webview2/
-
-### Ошибка сборки Tauri
-
-**Решение:**
-```bash
-# Очистите кэш
-cd src-tauri
+### Ручная очистка Rust-сборки
+```bat
+cd /d app\src-tauri
 cargo clean
-
-# Обновите зависимости
-cargo update
-
-# Пересоберите
-cargo tauri build
+cd /d ..\..
 ```
 
-### Ошибка: "failed to download FFmpeg"
+## Проверки перед отправкой изменений
 
-**Решение:**
-1. Скачайте FFmpeg вручную:
-   - https://github.com/BtbN/FFmpeg-Builds/releases
-   - Выберите "ffmpeg-master-latest-win64-gpl.zip"
-2. Распакуйте в папку `ffmpeg\`
-3. Убедитесь, что `ffmpeg.exe` находится в `ffmpeg\bin\`
-
----
-
-## 📋 Чек-лист установки
-
-- [ ] Python 3.8+ установлен
-- [ ] Python добавлен в PATH
-- [ ] Rust установлен
-- [ ] Rust добавлен в PATH
-- [ ] Visual Studio Build Tools установлен
-- [ ] WebView2 Runtime установлен
-- [ ] Node.js установлен (опционально)
-- [ ] yt-dlp установлен (`pip install yt-dlp`)
-- [ ] Tauri CLI установлен (`cargo install tauri-cli`)
-- [ ] FFmpeg скачан (опционально, скачивается автоматически)
-
----
-
-## 🚀 Быстрая установка (все команды)
-
-```bash
-# 1. Установите Python зависимости
-pip install yt-dlp
-
-# 2. Установите Tauri CLI
-cargo install tauri-cli --version "^1.6"
-
-# 3. Запустите сборку
-build.bat
+```bat
+python -m compileall -q .
+python -m unittest discover -s tests -v
+node --check app\src\main.js
+cargo check --manifest-path app\src-tauri\Cargo.toml
 ```
 
----
-
-## 📞 Поддержка
-
-Если возникли проблемы:
-1. Проверьте все зависимости установлены
-2. Перезапустите командную строку
-3. Проверьте PATH
-4. Попробуйте переустановить проблемный компонент
-
----
-
-**Удачи в сборке! 🎉**
+Проверка `cargo check` должна выполняться в окружении с установленными Windows/Tauri build dependencies.
