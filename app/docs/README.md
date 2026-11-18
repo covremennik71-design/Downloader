@@ -1,201 +1,76 @@
-# 🎬 YouTube Downloader — Tauri + Python Edition
+# YouTube Downloader — Tauri + Python
 
-Современный загрузчик видео с YouTube, построенный на связке **Tauri** (лёгкий WebView) + **Python** (yt-dlp).
+Проект содержит две рабочие точки запуска:
 
-## ✨ Особенности
+- **Tauri GUI:** HTML/CSS/JavaScript в `app/src`, Rust-команды и запуск yt-dlp в `app/src-tauri`.
+- **Standalone Python GUI:** `downloader.py` с CustomTkinter.
 
-- 🎨 **Современный UI** — HTML/CSS/JavaScript с красивыми анимациями
-- 🚀 **Лёгкий EXE** — всего ~5-10 MB (vs 150 MB у Electron)
-- 📺 **Все доступные качества** — от 144p до 4K
-- 🎵 **Извлечение аудио** — MP3 320 kbps
-- 🔥 **FFmpeg интеграция** — автоматическое объединение видео+аудио
-- 💾 **Малое потребление RAM** — используется системный WebView
+## Возможности
 
-## 📋 Требования
+- Загрузка видео YouTube с выбором качества.
+- Извлечение аудио в MP3 при наличии FFmpeg.
+- Прогресс загрузки и отмена.
+- Выбор папки сохранения.
+- Проверка и нормализация ссылок YouTube.
 
-Перед сборкой убедитесь, что установлены:
+## Требования
 
-### 1. Python 3.8+
-```
-https://python.org/downloads/
-```
-При установке **обязательно** отметьте "Add Python to PATH"
+- Python 3.10+ и `yt-dlp`.
+- Для standalone GUI также устанавливается CustomTkinter из корневого `requirements.txt`.
+- Для Tauri-разработки и сборки: Rust, Tauri CLI 1.x, WebView2 и Windows C++ Build Tools.
+- FFmpeg необязателен для базовой загрузки, но нужен для объединения потоков и MP3-конвертации.
 
-### 2. Rust
-```
-https://rustup.rs
-```
-Запустите `rustup-init.exe` и следуйте инструкциям
+## Быстрый старт
 
-### 3. WebView2 (Windows 10/11)
-Обычно уже установлен. Если нет:
-```
-https://developer.microsoft.com/en-us/microsoft-edge/webview2/
+Из корня репозитория:
+
+```bat
+python -m pip install -r requirements.txt
+run.bat
 ```
 
-## 🚀 Быстрый старт
+Для разработки Tauri:
 
-### Режим разработки (с горячей перезагрузкой)
-
-```bash
+```bat
 dev.bat
 ```
 
-### Сборка в EXE
+Для сборки Tauri EXE:
 
-```bash
+```bat
 build.bat
 ```
 
-Готовый EXE появится в папке `dist\YouTube Downloader.exe`
+EXE создаётся в корне репозитория как `YouTube Downloader.exe`.
 
-## 📁 Структура проекта
+**Ограничение упаковки:** текущий Tauri EXE запускает системный Python и требует установленный `yt-dlp`; он не включает в себя интерпретатор Python и все Python-зависимости. Для FFmpeg можно использовать `download_ffmpeg.bat`.
 
-```
+## Фактическая структура
+
+```text
 Downloader/
-│
-├── 📁 src-tauri/              # Rust backend (Tauri)
-│   ├── src/
-│   │   └── main.rs            # Связка Tauri + Python
-│   ├── Cargo.toml             # Rust зависимости
-│   ├── tauri.conf.json        # Конфигурация Tauri
-│   └── build.rs               # Build скрипт
-│
-├── 📁 src/                    # Frontend (HTML/CSS/JS)
-│   ├── index.html             # Главный HTML файл
-│   ├── style.css              # Все стили (современный дизайн)
-│   └── main.js                # JavaScript логика
-│
-├── 📁 backend/                # Python backend
-│   └── requirements.txt       # Python зависимости
-│
-├── 📁 ffmpeg/                 # FFmpeg (скачивается автоматически)
-│   └── bin/
-│       ├── ffmpeg.exe
-│       └── ffprobe.exe
-│
-├── 📁 dist/                   # Готовый EXE после сборки
-│   ├── YouTube Downloader.exe
-│   └── ffmpeg/
-│
-├── 🔧 build.bat               # Скрипт сборки
-├── 🔧 dev.bat                 # Режим разработки
-└── 📄 README.md               # Эта документация
+├── downloader.py
+├── url_utils.py
+├── config.json
+├── requirements.txt
+├── run.bat
+├── build.bat
+├── dev.bat
+├── download_ffmpeg.bat
+├── Downloader.spec
+├── tests/
+├── .github/workflows/ci.yml
+└── app/
+    ├── src/
+    │   ├── index.html
+    │   ├── style.css
+    │   └── main.js
+    ├── src-tauri/
+    │   ├── src/main.rs
+    │   ├── Cargo.toml
+    │   └── tauri.conf.json
+    ├── backend/requirements.txt
+    └── docs/
 ```
 
-## 🏗️ Как это работает
-
-```
-┌─────────────────────────────────────┐
-│         Frontend (HTML/CSS/JS)      │
-│    Современный UI с анимациями      │
-│    Все возможности CSS3             │
-└──────────────┬──────────────────────┘
-               │ Tauri IPC
-               ▼
-┌─────────────────────────────────────┐
-│         Tauri (Rust)                │
-│    - Управление окном               │
-│    - Вызов Python скриптов          │
-│    - Передача прогресса в UI        │
-│    - Диалоги выбора файлов          │
-└──────────────┬──────────────────────┘
-               │ Subprocess
-               ▼
-┌─────────────────────────────────────┐
-│         Python Backend              │
-│    - yt-dlp (загрузка видео)        │
-│    - FFmpeg (объединение потоков)   │
-│    - Обработка форматов             │
-└─────────────────────────────────────┘
-```
-
-## 🎯 Использование
-
-### 1. Запустите приложение
-- Откройте `dist\YouTube Downloader.exe` (после сборки)
-- Или запустите `dev.bat` для режима разработки
-
-### 2. Вставьте ссылку
-- Скопируйте ссылку на YouTube видео
-- Вставьте в поле ввода (или нажмите кнопку вставки)
-
-### 3. Получите информацию
-- Нажмите "Получить информацию"
-- Дождитесь загрузки данных о видео
-
-### 4. Выберите качество
-- Переключайтесь между "Видео" и "Аудио"
-- Выберите нужное качество из доступных
-- Все доступные качества показываются автоматически
-
-### 5. Скачайте
-- Выберите папку сохранения
-- Нажмите "Скачать"
-- Следите за прогрессом в реальном времени
-
-## 🔧 Решение проблем
-
-### Ошибка сборки: "Rust not found"
-```bash
-# Установите Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-### Ошибка: "WebView2 not found"
-Скачайте и установите WebView2:
-https://developer.microsoft.com/en-us/microsoft-edge/webview2/
-
-### Видео без звука
-Убедитесь, что FFmpeg скачан в папку `ffmpeg\bin\`
-
-### Python не найден
-Добавьте Python в PATH или укажите полный путь
-
-## 🎨 Технологии
-
-| Компонент | Технология | Назначение |
-|-----------|-----------|------------|
-| Frontend | HTML5 + CSS3 + JavaScript | Современный UI |
-| Backend (связка) | Tauri (Rust) | Лёгкий WebView + IPC |
-| Backend (логика) | Python | yt-dlp + FFmpeg |
-| Загрузка видео | yt-dlp | Скачивание с YouTube |
-| Обработка медиа | FFmpeg | Объединение потоков |
-| Сборка | Cargo + Tauri CLI | Компиляция в EXE |
-
-## 📊 Преимущества перед Electron
-
-| Параметр | Tauri | Electron |
-|----------|-------|----------|
-| Размер EXE | ~5-10 MB | ~150 MB |
-| Потребление RAM | ~50-100 MB | ~300-500 MB |
-| Скорость запуска | Быстро | Медленно |
-| CSS поддержка | ✅ Полная | ✅ Полная |
-| Безопасность | ✅ Высокая | ⚠️ Средняя |
-
-## 🔄 Обновление
-
-```bash
-# Обновить Tauri CLI
-cargo install tauri-cli --force
-
-# Обновить Python зависимости
-pip install --upgrade yt-dlp
-
-# Пересобрать
-build.bat
-```
-
-## 📝 Лицензия
-
-MIT License
-
-## 🙏 Благодарности
-
-- [Tauri](https://tauri.app/) — лёгкий фреймворк для десктопных приложений
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — загрузчик видео
-- [FFmpeg](https://ffmpeg.org/) — обработка медиа
-
----
-
-**Создано с ❤️ для удобной загрузки видео**
+Дополнительные сведения по установке — в `INSTALL.md`; подробная карта файлов — в `STRUCTURE.md`.
