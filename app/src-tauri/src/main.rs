@@ -15,6 +15,26 @@ struct DownloadState {
     cancel_requested: AtomicBool,
 }
 
+fn terminate_download_process(child: &mut std::process::Child) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let pid = child.id().to_string();
+        let mut taskkill = Command::new("taskkill");
+        taskkill
+            .args(["/PID", &pid, "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        taskkill.creation_flags(CREATE_NO_WINDOW);
+        if let Ok(status) = taskkill.status() {
+            if status.success() {
+                return Ok(());
+            }
+        }
+    }
+
+    child.kill().map_err(|e| format!("Failed to terminate download process: {}", e))
+}
+
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
@@ -460,7 +480,7 @@ fn cancel_download(state: tauri::State<'_, DownloadState>) -> Result<String, Str
     match active.as_mut() {
         Some(child) => {
             state.cancel_requested.store(true, Ordering::SeqCst);
-            child.kill().map_err(|e| format!("Failed to cancel download: {}", e))?;
+            terminate_download_process(child)?;
             Ok("Cancellation requested".to_string())
         }
         None => Err("No active download".to_string()),
