@@ -30,15 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Regenerate Cargo.lock from the manifest
+      - name: Verify the committed Cargo.lock is reproducible
         working-directory: app/src-tauri
-        run: cargo generate-lockfile
-      - name: Check Tauri backend with the generated lockfile
+        run: cargo generate-lockfile --locked
+      - name: Check Tauri backend without changing dependencies
         run: cargo check --manifest-path app/src-tauri/Cargo.toml --locked
-      - name: Publish regenerated Cargo.lock for review
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: regenerated-cargo-lock
-          path: app/src-tauri/Cargo.lock
-          if-no-files-found: error
