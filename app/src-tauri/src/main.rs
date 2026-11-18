@@ -161,7 +161,14 @@ fn start_download(
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
-    
+    let requested_save_path = std::path::PathBuf::from(&save_path);
+    let save_path = if requested_save_path.is_absolute() {
+        requested_save_path
+    } else {
+        exe_dir.join(requested_save_path)
+    };
+    let save_path = save_path.to_string_lossy().to_string();
+
     // Проверяем несколько возможных расположений ffmpeg
     let ffmpeg_paths = [
         exe_dir.join("ffmpeg").join("bin").join("ffmpeg.exe"),
