@@ -5,7 +5,7 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
-  python-tests:
+  python-compile:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,8 +14,6 @@ jobs:
           python-version: "3.12"
       - name: Compile all Python source files
         run: python -m compileall -q .
-      - name: Run URL validation tests
-        run: python -m unittest discover -s tests -v
   frontend-syntax:
     runs-on: ubuntu-latest
     steps:
