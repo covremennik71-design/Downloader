@@ -364,6 +364,11 @@ class YouTubeDownloader:
                             filename = test_file
                             break
                 
+                if not os.path.isfile(filename):
+                    raise FileNotFoundError(
+                        "yt-dlp завершил работу, но итоговый файл не найден: " + filename
+                    )
+
                 if complete_callback:
                     complete_callback(filename, title)
                     
@@ -704,6 +709,8 @@ class DownloaderApp(ctk.CTk):
     def _show_error(self, error):
         """Показать ошибку."""
         self.status_label.configure(text=f"Ошибка: {error[:100]}", text_color="red")
+        self.download_btn.configure(state="normal")
+        self.cancel_btn.configure(state="disabled")
         self.get_info_btn.configure(state="normal")
         messagebox.showerror("Ошибка", f"Не удалось получить информацию:\n{error}")
     
