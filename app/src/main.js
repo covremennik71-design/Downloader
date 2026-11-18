@@ -65,6 +65,12 @@ function setupEventListeners() {
         try {
             const text = await navigator.clipboard.readText();
             urlInput.value = text;
+            infoRequestSequence += 1;
+            videoInfo = null;
+            selectedQuality = null;
+            videoInfoSection.style.display = 'none';
+            showLoading(false);
+            getInfoBtn.disabled = false;
             urlInput.focus();
         } catch (err) {
             console.error('Failed to read clipboard:', err);
