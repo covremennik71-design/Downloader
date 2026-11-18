@@ -1,261 +1,99 @@
-# 📁 Структура проекта YouTube Downloader
+# Актуальная структура проекта Downloader
 
-## Полная структура файлов
+Корень проекта — каталог, в котором находятся `README.md`, `downloader.py`, `build.bat` и папка `app/`. Путь к корню не должен быть привязан к имени пользователя или конкретному диску.
 
-```
-C:\Users\Smixr\Desktop\Downloader\
-│
-├── 📄 .gitignore                      # Исключения для Git
-│
-├── 📁 src-tauri/                      # 🦀 Tauri Backend (Rust)
-│   ├── 📄 Cargo.toml                  # Rust зависимости
-│   ├── 📄 tauri.conf.json             # Конфигурация Tauri
-│   ├── 📄 build.rs                    # Build скрипт
-│   ├── 📁 src/
-│   │   └── 📄 main.rs                 # Главный Rust файл (связка с Python)
-│   ├── 📁 target/                     # Скомпилированные файлы (создаётся при сборке)
-│   │   ├── 📁 debug/                  # Debug версия
-│   │   └── 📁 release/                # Release версия (EXE)
-│   └── 📁 icons/                      # Иконки приложения
-│
-├── 📁 src/                            # 🎨 Frontend (HTML/CSS/JS)
-│   ├── 📄 index.html                  # Главный HTML файл
-│   ├── 📄 style.css                   # Все стили (современный дизайн)
-│   └── 📄 main.js                     # JavaScript логика
-│
-├── 📁 backend/                        # 🐍 Python Backend
-│   └── 📄 requirements.txt            # Python зависимости
-│
-├── 📁 ffmpeg/                         # 🎬 FFmpeg (скачивается автоматически)
-│   └── 📁 bin/
-│       ├── 📄 ffmpeg.exe              # Основной FFmpeg
-│       └── 📄 ffprobe.exe             # FFprobe
-│
-├── 📁 dist/                           # 📦 Готовое приложение (после сборки)
-│   ├── 📄 YouTube Downloader.exe      # Главный EXE файл
-│   └── 📁 ffmpeg/
-│       └── 📁 bin/
-│           ├── 📄 ffmpeg.exe
-│           └── 📄 ffprobe.exe
-│
-├── 📁 icons/                          # 🖼️ Иконки для приложения
-│   ├── 📄 icon.ico                    # Windows иконка
-│   ├── 📄 icon.png                    # PNG иконка
-│   ├── 📄 32x32.png                   # 32x32 иконка
-│   └── 📄 128x128.png                 # 128x128 иконка
-│
-├── 🔧 build.bat                       # 🏗️ Скрипт сборки EXE
-├── 🔧 dev.bat                         # 🚀 Режим разработки
-├── 🔧 run.bat                         # ▶️ Быстрый запуск (старая версия)
-├── 🔧 download_ffmpeg.bat             # 📥 Загрузка FFmpeg вручную
-│
-├── 📄 README.md                       # 📖 Основная документация
-├── 📄 DOCUMENTATION.md                # 📘 Техническая документация
-├── 📄 INSTALL.md                      # 📥 Инструкция по установке
-├── 📄 STRUCTURE.md                    # 📁 Этот файл
-│
-├── 📄 config.json                     # ⚙️ Конфигурация (старая версия)
-├── 📄 requirements.txt                # 📦 Python зависимости (старая версия)
-├── 📄 downloader.py                   # 🐍 Старый Python код (customtkinter)
-├── 📄 Downloader.spec                 # 📦 PyInstaller spec (старая версия)
-│
-└── 📁 downloads/                      # 📂 Папка для загрузок (старая версия)
+```text
+Downloader/
+├── .github/
+│   └── workflows/ci.yml             # CI: Python, JavaScript, Rust/Tauri
+├── app/
+│   ├── src/                         # Tauri frontend
+│   │   ├── index.html
+│   │   ├── style.css
+│   │   └── main.js
+│   ├── src-tauri/                   # Tauri backend
+│   │   ├── src/main.rs
+│   │   ├── Cargo.toml
+│   │   ├── Cargo.lock
+│   │   ├── tauri.conf.json
+│   │   └── icons/
+│   ├── backend/requirements.txt     # Python dependencies for backend reference
+│   ├── docs/                        # Project documentation
+│   └── generate_icon.py
+├── tests/
+│   ├── test_url_utils.py
+│   ├── test_embedded_scripts.py
+│   └── test_runtime_contracts.py
+├── downloader.py                    # Standalone CustomTkinter application
+├── url_utils.py                     # Shared URL validation for Python GUI
+├── config.json
+├── requirements.txt
+├── Downloader.spec                  # Optional PyInstaller build definition
+├── build.bat                        # Tauri executable build
+├── dev.bat                          # Tauri development mode
+├── run.bat                          # Standalone Python GUI launcher
+└── download_ffmpeg.bat              # FFmpeg download into ffmpeg/bin
 ```
 
----
+## Два приложения
 
-## 🎯 Основные компоненты
+### Tauri
 
-### 1. Frontend (src/)
+Поток выполнения:
 
-**Технологии:** HTML5, CSS3, JavaScript (ES6+)
-
-**Файлы:**
-- `index.html` — структура UI
-- `style.css` — стили, анимации, темы
-- `main.js` — интерактивность, Tauri API
-
-**Особенности:**
-- Современный дизайн с glassmorphism эффектами
-- Адаптивная вёрстка
-- Плавные анимации
-- Тёмная тема
-
----
-
-### 2. Tauri Backend (src-tauri/)
-
-**Технологии:** Rust, Tauri Framework
-
-**Файлы:**
-- `main.rs` — связка Tauri + Python
-- `Cargo.toml` — Rust зависимости
-- `tauri.conf.json` — конфигурация приложения
-- `build.rs` — build скрипт
-
-**Функции:**
-- Управление окном приложения
-- Вызов Python скриптов
-- Передача прогресса в реальном времени
-- Диалоги выбора файлов
-- Безопасное выполнение команд
-
----
-
-### 3. Python Backend (backend/)
-
-**Технологии:** Python, yt-dlp, FFmpeg
-
-**Файлы:**
-- `requirements.txt` — зависимости
-
-**Скрипты (создаются динамически в main.rs):**
-- `yt_info.py` — получение информации о видео
-- `yt_download.py` — загрузка видео
-
-**Функции:**
-- Извлечение метаданных видео
-- Загрузка видео в выбранном качестве
-- Извлечение аудио в MP3
-- Объединение видео+аудио через FFmpeg
-- Отправка прогресса через stdout
-
----
-
-## 🔄 Поток данных
-
-```
-1. Пользователь вводит URL
-   ↓
-2. Frontend (main.js) вызывает invoke('get_video_info')
-   ↓
-3. Tauri (main.rs) создаёт Python скрипт и выполняет
-   ↓
-4. Python (yt_info.py) получает информацию через yt-dlp
-   ↓
-5. Tauri возвращает JSON в Frontend
-   ↓
-6. Frontend отображает видеокарточку и список качеств
-   ↓
-7. Пользователь выбирает качество и нажимает "Скачать"
-   ↓
-8. Frontend вызывает invoke('start_download')
-   ↓
-9. Tauri запускает Python скрипт (yt_download.py)
-   ↓
-10. Python загружает видео и отправляет прогресс через stdout
-    ↓
-11. Tauri читает stdout и отправляет события в Frontend
-    ↓
-12. Frontend обновляет прогресс-бар в реальном времени
-    ↓
-13. После завершения Frontend показывает уведомление
+```text
+app/src/index.html + main.js
+        │ invoke/listen
+        ▼
+app/src-tauri/src/main.rs
+        │ запускает Python subprocess
+        ▼
+yt-dlp + optional FFmpeg
 ```
 
----
+Tauri использует системный Python и пакет `yt-dlp`. Активный Python-процесс хранится в управляемом состоянии Tauri; команда отмены завершает его. На Windows используется завершение дерева процессов, чтобы не оставлять дочерний FFmpeg-процесс.
 
-## 📊 Размеры файлов
+### Standalone Python GUI
 
-| Файл/Папка | Размер | Назначение |
-|------------|--------|------------|
-| `src/` | ~50 KB | Frontend код |
-| `src-tauri/src/` | ~15 KB | Rust код |
-| `backend/` | ~1 KB | Python зависимости |
-| `ffmpeg/` | ~200 MB | FFmpeg binaries |
-| `dist/` | ~10-15 MB | Готовое приложение |
-| `src-tauri/target/` | ~500 MB | Build artifacts |
-
----
-
-## 🚀 Команды
-
-### Разработка
-```bash
-dev.bat          # Запуск в режиме разработки
+```text
+run.bat
+  └── downloader.py
+        ├── CustomTkinter
+        ├── url_utils.py
+        ├── yt-dlp
+        └── optional FFmpeg
 ```
 
-### Сборка
-```bash
-build.bat        # Сборка в EXE
+Загрузка и получение метаданных выполняются в фоновых потоках. Обновление Tkinter-виджетов выполняется через callback главного потока.
+
+## Пути и выходные файлы
+
+- Конфигурация использует относительный путь `downloads` по умолчанию.
+- Tauri разрешает относительную папку загрузки относительно каталога EXE.
+- `download_ffmpeg.bat` размещает FFmpeg в корневом `ffmpeg/bin`.
+- `build.bat` при наличии FFmpeg копирует его в `app/ffmpeg/bin` для сборки, а затем рядом с итоговым EXE.
+- `build.bat` создаёт `YouTube Downloader.exe` в корне репозитория. Это не полноценный installer и не self-contained Python bundle.
+
+## Команды
+
+Из корня репозитория:
+
+```bat
+run.bat
+dev.bat
+build.bat
+download_ffmpeg.bat
 ```
 
-### Ручная сборка
-```bash
-cd src-tauri
-cargo tauri build
+Ручные Rust-команды:
+
+```bat
+cd /d app\src-tauri
+cargo check
+cargo tauri dev
+cargo tauri build --no-bundle
 ```
 
-### Очистка
-```bash
-cd src-tauri
-cargo clean
-```
+## Статус документации
 
----
-
-## 📝 Примечания
-
-### Старые файлы (можно удалить)
-Следующие файлы остались от старой версии на customtkinter:
-- `downloader.py` — старый Python код
-- `Downloader.spec` — старый PyInstaller spec
-- `config.json` — старый конфиг
-- `requirements.txt` — старые зависимости
-- `run.bat` — старый запуск
-- `download_ffmpeg.bat` — старая загрузка FFmpeg
-- `downloads/` — старая папка загрузок
-
-**Рекомендация:** Удалите эти файлы, чтобы не было путаницы.
-
-### Новые файлы (Tauri версия)
-- `src/` — новый frontend
-- `src-tauri/` — новый backend
-- `backend/` — Python зависимости
-- `build.bat` — новый скрипт сборки
-- `dev.bat` — режим разработки
-
----
-
-## 🎨 Архитектурная диаграмма
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    User Interface                        │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  HTML + CSS + JavaScript (src/)                  │  │
-│  │  - Современный дизайн                            │  │
-│  │  - Анимации                                      │  │
-│  │  - Интерактивность                               │  │
-│  └──────────────────────────────────────────────────┘  │
-└────────────────────┬────────────────────────────────────┘
-                     │ Tauri IPC
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Tauri Layer                           │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  Rust (src-tauri/src/main.rs)                    │  │
-│  │  - Управление окном                              │  │
-│  │  - Вызов Python                                  │  │
-│  │  - Передача данных                               │  │
-│  └──────────────────────────────────────────────────┘  │
-└────────────────────┬────────────────────────────────────┘
-                     │ Subprocess
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Python Layer                          │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  Python Scripts (dynamic)                        │  │
-│  │  - yt-dlp (загрузка)                             │  │
-│  │  - FFmpeg (обработка)                            │  │
-│  │  - Progress hooks                                │  │
-│  └──────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## ✅ Готово к использованию!
-
-Проект полностью готов к сборке и запуску. Следуйте инструкциям в `INSTALL.md` для установки зависимостей и `README.md` для использования.
-
-**Приятного использования! 🎉**
+Эта карта отражает текущие пути репозитория. Старые инструкции с `src-tauri/`, `src/`, `backend/` в корне, `dist/` или персональными путями Windows относились к предыдущей структуре и не должны использоваться.
