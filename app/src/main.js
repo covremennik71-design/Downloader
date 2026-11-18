@@ -8,9 +8,13 @@ let videoInfo = null;
 let selectedQuality = null;
 let selectedFormat = 'video';
 let isDownloading = false;
+let infoRequestSequence = 0;
+let activeDownloadPromise = null;
+let cancelCommandPromise = null;
+let cancelRequested = false;
 let config = {
     apiKey: '',
-    defaultPath: 'C:\\Users\\Smixr\\Downloads',
+    defaultPath: 'downloads',
     defaultQuality: '1080p'
 };
 
@@ -40,6 +44,10 @@ const successMessage = document.getElementById('successMessage');
 const newDownloadBtn = document.getElementById('newDownloadBtn');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsModal = document.getElementById('settingsModal');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const defaultPathInput = document.getElementById('defaultPathInput');
+const defaultQualitySelect = document.getElementById('defaultQualitySelect');
+const browseDefaultBtn = document.getElementById('browseDefaultBtn');
 const closeSettingsModal = document.getElementById('closeSettingsModal');
 const cancelSettings = document.getElementById('cancelSettings');
 const saveSettings = document.getElementById('saveSettings');
@@ -60,6 +68,12 @@ function setupEventListeners() {
         try {
             const text = await navigator.clipboard.readText();
             urlInput.value = text;
+            infoRequestSequence += 1;
+            videoInfo = null;
+            selectedQuality = null;
+            videoInfoSection.style.display = 'none';
+            showLoading(false);
+            getInfoBtn.disabled = false;
             urlInput.focus();
         } catch (err) {
             console.error('Failed to read clipboard:', err);
@@ -67,9 +81,12 @@ function setupEventListeners() {
     });
 
     urlInput.addEventListener('input', () => {
+        infoRequestSequence += 1;
         videoInfo = null;
         selectedQuality = null;
         videoInfoSection.style.display = 'none';
+        showLoading(false);
+        getInfoBtn.disabled = false;
     });
 
     // Get info button
@@ -105,7 +122,20 @@ function setupEventListeners() {
     newDownloadBtn.addEventListener('click', resetUI);
 
     // Settings
-    settingsBtn.addEventListener('click', () => settingsModal.classList.add('active'));
+    settingsBtn.addEventListener('click', () => {
+        apiKeyInput.value = config.apiKey || '';
+        defaultPathInput.value = config.defaultPath || 'downloads';
+        defaultQualitySelect.value = config.defaultQuality || '1080p';
+        settingsModal.classList.add('active');
+    });
+    browseDefaultBtn.addEventListener('click', async () => {
+        try {
+            const folder = await invoke('select_folder');
+            if (folder) defaultPathInput.value = folder;
+        } catch (err) {
+            console.error('Failed to select default folder:', err);
+        }
+    });
     closeSettingsModal.addEventListener('click', () => settingsModal.classList.remove('active'));
     cancelSettings.addEventListener('click', () => settingsModal.classList.remove('active'));
     saveSettings.addEventListener('click', handleSaveSettings);
@@ -120,6 +150,9 @@ function setupEventListeners() {
 
 // ===== Progress Listener =====
 async function setupProgressListener() {
+    await listen('download-started', () => {
+        if (isDownloading) cancelBtn.disabled = false;
+    });
     await listen('download-progress', (event) => {
         try {
             const data = JSON.parse(event.payload);
@@ -131,7 +164,9 @@ async function setupProgressListener() {
             } else if (data.type === 'complete') {
                 handleDownloadComplete(data);
             } else if (data.type === 'error') {
-                handleDownloadError(data.error);
+                // The invoke promise reports the process exit as a rejection.
+                // Do not show a second alert for the same failure event.
+                console.error('Downloader process error:', data.error);
             }
         } catch (err) {
             console.error('Failed to parse progress:', err);
@@ -146,17 +181,21 @@ function loadConfig() {
         if (saved) {
             config = { ...config, ...JSON.parse(saved) };
         }
-        savePathInput.value = config.defaultPath;
+        // Migrate the old developer-machine default instead of exposing a dead path.
+        if (/^C:\\Users\\Smixr\\/i.test(config.defaultPath || '')) {
+            config.defaultPath = 'downloads';
+            localStorage.setItem('downloader_config', JSON.stringify(config));
+        }
+        savePathInput.value = config.defaultPath || 'downloads';
+        if (apiKeyInput) apiKeyInput.value = config.apiKey || '';
+        if (defaultPathInput) defaultPathInput.value = config.defaultPath || 'downloads';
+        if (defaultQualitySelect) defaultQualitySelect.value = config.defaultQuality || '1080p';
     } catch (err) {
         console.error('Failed to load config:', err);
     }
 }
 
 function handleSaveSettings() {
-    const apiKeyInput = document.getElementById('apiKeyInput');
-    const defaultPathInput = document.getElementById('defaultPathInput');
-    const defaultQualitySelect = document.getElementById('defaultQualitySelect');
-
     config.apiKey = apiKeyInput.value;
     config.defaultPath = defaultPathInput.value || config.defaultPath;
     config.defaultQuality = defaultQualitySelect.value;
@@ -181,12 +220,14 @@ async function handleGetInfo() {
         return;
     }
     urlInput.value = normalizedUrl;
+    const requestId = ++infoRequestSequence;
 
     showLoading(true);
     getInfoBtn.disabled = true;
 
     try {
         const result = await invoke('get_video_info', { url: normalizedUrl });
+        if (requestId !== infoRequestSequence) return;
         videoInfo = JSON.parse(result);
         
         if (videoInfo.error) {
@@ -196,24 +237,24 @@ async function handleGetInfo() {
         displayVideoInfo(videoInfo);
         videoInfoSection.style.display = 'block';
     } catch (err) {
-        console.error('Failed to get video info:', err);
-        alert('Failed to get video info: ' + err.message);
+        if (requestId === infoRequestSequence) {
+            console.error('Failed to get video info:', err);
+            alert('Failed to get video info: ' + err.message);
+        }
     } finally {
-        showLoading(false);
-        getInfoBtn.disabled = false;
+        if (requestId === infoRequestSequence) {
+            showLoading(false);
+            getInfoBtn.disabled = false;
+        }
     }
 }
 
 function displayVideoInfo(info) {
     // Thumbnail
-    if (info.thumbnail) {
-        videoThumbnail.src = info.thumbnail;
-    }
+    videoThumbnail.src = info.thumbnail || '';
+    videoDuration.textContent = info.duration ? formatDuration(info.duration) : '0:00';
 
     // Duration
-    if (info.duration) {
-        videoDuration.textContent = formatDuration(info.duration);
-    }
 
     // Title
     videoTitle.textContent = info.title || 'Unknown Title';
@@ -222,9 +263,7 @@ function displayVideoInfo(info) {
     videoUploader.textContent = info.uploader || 'Unknown Channel';
 
     // Views
-    if (info.view_count) {
-        videoViews.textContent = formatViews(info.view_count) + ' views';
-    }
+    videoViews.textContent = info.view_count ? formatViews(info.view_count) + ' views' : '0 views';
 
     // Render quality options
     renderQualityOptions();
@@ -351,20 +390,36 @@ async function handleDownload() {
     }
 
     isDownloading = true;
+    cancelRequested = false;
+    cancelCommandPromise = null;
     videoInfoSection.style.display = 'none';
     progressSection.style.display = 'block';
     downloadBtn.disabled = true;
+    cancelBtn.disabled = true;
 
+    const downloadPromise = invoke('start_download', {
+        url: urlInput.value.trim(),
+        quality: selectedQuality,
+        formatType: selectedFormat,
+        savePath: savePath
+    });
+    activeDownloadPromise = downloadPromise;
     try {
-        await invoke('start_download', {
-            url: urlInput.value.trim(),
-            quality: selectedQuality,
-            formatType: selectedFormat,
-            savePath: savePath
-        });
+        await downloadPromise;
+        if (cancelCommandPromise) await cancelCommandPromise.catch(() => null);
+        // The final stdout event is asynchronous; the command result is a fallback.
+        if (isDownloading) {
+            if (cancelRequested) handleDownloadCancelled();
+            else handleDownloadComplete({ title: videoInfo?.title || 'Video' });
+        }
     } catch (err) {
+        if (cancelCommandPromise) await cancelCommandPromise.catch(() => null);
         console.error('Download failed:', err);
-        handleDownloadError(err);
+        if (cancelRequested && isDownloading) handleDownloadCancelled();
+        else handleDownloadError(err);
+    } finally {
+        if (activeDownloadPromise === downloadPromise) activeDownloadPromise = null;
+        cancelCommandPromise = null;
     }
 }
 
@@ -390,7 +445,9 @@ function updateProgress(data) {
 }
 
 function handleDownloadComplete(data) {
+    if (!isDownloading || cancelRequested || cancelCommandPromise) return;
     isDownloading = false;
+    cancelBtn.disabled = true;
     progressSection.style.display = 'none';
     successSection.style.display = 'block';
     successMessage.textContent = `"${data.title}" successfully downloaded!`;
@@ -401,18 +458,34 @@ function handleDownloadError(error) {
     progressSection.style.display = 'none';
     videoInfoSection.style.display = 'block';
     downloadBtn.disabled = false;
+    cancelBtn.disabled = true;
     alert('Download failed: ' + error);
 }
 
+function handleDownloadCancelled() {
+    if (!isDownloading) return;
+    isDownloading = false;
+    cancelRequested = false;
+    cancelBtn.disabled = true;
+    progressSection.style.display = 'none';
+    videoInfoSection.style.display = 'block';
+    downloadBtn.disabled = false;
+}
+
 async function handleCancel() {
+    if (!isDownloading || cancelBtn.disabled || !activeDownloadPromise) return;
+    cancelBtn.disabled = true;
+    const request = invoke('cancel_download');
+    cancelCommandPromise = request;
     try {
-        await invoke('cancel_download');
-        isDownloading = false;
-        progressSection.style.display = 'none';
-        videoInfoSection.style.display = 'block';
-        downloadBtn.disabled = false;
+        const result = await request;
+        cancelRequested = result === 'Cancellation requested';
+        if (activeDownloadPromise) await activeDownloadPromise.catch(() => {});
+        if (cancelRequested && isDownloading) handleDownloadCancelled();
     } catch (err) {
         console.error('Failed to cancel:', err);
+        cancelRequested = false;
+        if (isDownloading) cancelBtn.disabled = false;
     }
 }
 

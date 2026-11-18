@@ -20,24 +20,11 @@ cd Downloader
 pip install -r requirements.txt
 ```
 
-### 3. Вставьте свой YouTube API ключ
+### 3. Настройте папку загрузки (необязательно)
 
-Откройте файл `config.json` и вставьте ключ в поле `youtube_api_key`:
+По умолчанию файлы сохраняются в папку `downloads` рядом с приложением. Папку можно изменить в настройках или через поле выбора каталога. Путь по умолчанию больше не привязан к компьютеру разработчика.
 
-```json
-{
-    "youtube_api_key": "YOUR_API_KEY_HERE",
-    "download_path": "C:\\Users\\Smixr\\Videos\\YouTube",
-    "theme": "dark",
-    "video_format": "mp4",
-    "audio_format": "mp3",
-    "default_quality": "1080p"
-}
-```
-
-> Получить бесплатный ключ: [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → Create API Key → включить **YouTube Data API v3**.
-
-Ключ также можно задать через UI настроек приложения (кнопка "Настройки").
+Ключ YouTube Data API для обычной загрузки через yt-dlp не требуется.
 
 ### 4. Запуск
 
@@ -92,9 +79,9 @@ Downloader/
 
 ## Требования
 
-- **Python 3.8+**
+- **Python 3.10+** (для актуальных версий yt-dlp)
 - **Rust** (только для сборки Tauri-версии)
-- **ffmpeg** — автоматически скачивается через `download_ffmpeg.bat` или уже находится в `ffmpeg/bin/`
+- **ffmpeg** — нужен для объединения отдельных видео- и аудиопотоков и конвертации в MP3; скачивается через `download_ffmpeg.bat`
 
 ## ffmpeg
 

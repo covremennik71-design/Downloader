@@ -6,7 +6,34 @@
 use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
 use std::thread;
-use tauri::{Manager, Window};
+use std::sync::{Mutex, atomic::{AtomicBool, Ordering}};
+use std::time::Duration;
+use tauri::{Window};
+
+struct DownloadState {
+    active_child: Mutex<Option<std::process::Child>>,
+    cancel_requested: AtomicBool,
+}
+
+fn terminate_download_process(child: &mut std::process::Child) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let pid = child.id().to_string();
+        let mut taskkill = Command::new("taskkill");
+        taskkill
+            .args(["/PID", pid.as_str(), "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        taskkill.creation_flags(CREATE_NO_WINDOW);
+        if let Ok(status) = taskkill.status() {
+            if status.success() {
+                return Ok(());
+            }
+        }
+    }
+
+    child.kill().map_err(|e| format!("Failed to terminate download process: {}", e))
+}
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -16,7 +43,7 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 // Команда для получения информации о видео
 #[tauri::command]
-fn get_video_info(window: Window, url: String) -> Result<String, String> {
+fn get_video_info(url: String) -> Result<String, String> {
     let python_script = r#"
 import sys
 import json
@@ -124,19 +151,28 @@ if __name__ == '__main__':
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
     
-    let output = cmd.output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    let output = match cmd.output() {
+        Ok(output) => output,
+        Err(error) => {
+            let _ = std::fs::remove_file(&temp_script);
+            return Err(format!("Failed to execute Python: {}", error));
+        }
+    };
 
     // Декодируем вывод как UTF-8
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
-    if !stderr.is_empty() && output.status.code() != Some(0) {
-        return Err(format!("Python error: {}", stderr));
-    }
+    // Always remove the temporary script, including when Python exits with an error.
+    let _ = std::fs::remove_file(&temp_script);
 
-    // Удаляем временный файл
-    let _ = std::fs::remove_file(temp_script);
+    if !output.status.success() {
+        return Err(if stderr.is_empty() {
+            format!("Python exited with status {}", output.status)
+        } else {
+            format!("Python error: {}", stderr)
+        });
+    }
 
     Ok(stdout.trim().to_string())
 }
@@ -145,6 +181,7 @@ if __name__ == '__main__':
 #[tauri::command]
 fn start_download(
     window: Window,
+    state: tauri::State<'_, DownloadState>,
     url: String,
     quality: String,
     format_type: String,
@@ -155,7 +192,14 @@ fn start_download(
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
-    
+    let requested_save_path = std::path::PathBuf::from(&save_path);
+    let save_path = if requested_save_path.is_absolute() {
+        requested_save_path
+    } else {
+        exe_dir.join(requested_save_path)
+    };
+    let save_path = save_path.to_string_lossy().to_string();
+
     // Проверяем несколько возможных расположений ffmpeg
     let ffmpeg_paths = [
         exe_dir.join("ffmpeg").join("bin").join("ffmpeg.exe"),
@@ -257,13 +301,21 @@ def progress_hook(d):
         data = {'type': 'finished', 'filename': d.get('filename', '')}
         print(json.dumps(data, ensure_ascii=False), flush=True)
 
-def download(url, quality, format_type, save_path, ffmpeg_arg=None):
+def _download_impl(url, quality, format_type, save_path, ffmpeg_arg=None):
     url = normalize_youtube_url(url)
     save_path = os.path.abspath(os.path.expanduser(save_path))
     os.makedirs(save_path, exist_ok=True)
     ffmpeg_dir = find_ffmpeg(ffmpeg_arg)
-    has_ffmpeg = ffmpeg_dir is not None and os.path.exists(os.path.join(ffmpeg_dir, 'ffmpeg.exe'))
-    
+    has_ffmpeg = ffmpeg_dir is not None and os.path.isfile(os.path.join(ffmpeg_dir, 'ffmpeg.exe'))
+
+    if format_type not in ('video', 'audio'):
+        raise ValueError('Unsupported download format')
+    if format_type == 'audio' and not has_ffmpeg:
+        raise RuntimeError('FFmpeg is required to extract audio as MP3')
+    if format_type == 'video' and quality != 'best':
+        if not quality.endswith('p') or not quality[:-1].isdigit():
+            raise ValueError('Unsupported video quality')
+
     # Определяем формат
     if format_type == 'audio':
         format_string = 'bestaudio/best'
@@ -307,11 +359,25 @@ def download(url, quality, format_type, save_path, ffmpeg_arg=None):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            
-            if format_type == 'audio':
-                filename = os.path.splitext(filename)[0] + '.mp3'
-            
+            prepared_filename = ydl.prepare_filename(info)
+            base_filename = os.path.splitext(prepared_filename)[0]
+            candidates = [
+                info.get('filepath'),
+                prepared_filename,
+                base_filename + ('.mp3' if format_type == 'audio' else '.mp4'),
+                base_filename + '.mkv',
+                base_filename + '.webm',
+                base_filename + '.m4a',
+            ]
+            filename = next(
+                (candidate for candidate in candidates if candidate and os.path.isfile(candidate)),
+                None
+            )
+            if filename is None:
+                raise FileNotFoundError(
+                    'yt-dlp finished but the expected output file was not found'
+                )
+
             result = {
                 'type': 'complete',
                 'success': True,
@@ -327,6 +393,17 @@ def download(url, quality, format_type, save_path, ffmpeg_arg=None):
             'error': str(e)
         }
         print(json.dumps(result, ensure_ascii=False), flush=True)
+        return 1
+
+def download(url, quality, format_type, save_path, ffmpeg_arg=None):
+    try:
+        return _download_impl(url, quality, format_type, save_path, ffmpeg_arg)
+    except Exception as e:
+        print(json.dumps({
+            'type': 'error',
+            'success': False,
+            'error': str(e)
+        }), flush=True)
         return 1
 
 if __name__ == '__main__':
@@ -360,10 +437,31 @@ if __name__ == '__main__':
     cmd.creation_flags(CREATE_NO_WINDOW);
     
     let mut child = cmd.spawn()
-        .map_err(|e| format!("Failed to start Python: {}", e))?;
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&temp_script);
+            format!("Failed to start Python: {}", e)
+        })?;
+
+    // Detach both pipes before moving Child into shared state.
+    let stdout_pipe = child.stdout.take();
+    let stderr_pipe = child.stderr.take();
+
+    {
+        let mut active = state.active_child.lock().map_err(|e| e.to_string())?;
+        if active.is_some() {
+            let _ = child.kill();
+            let _ = std::fs::remove_file(&temp_script);
+            return Err("A download is already running".to_string());
+        }
+        state.cancel_requested.store(false, Ordering::SeqCst);
+        *active = Some(child);
+    }
+
+    // Do not expose cancellation until the child is registered in shared state.
+    let _ = window.emit("download-started", true);
 
     // Читаем вывод в реальном времени
-    if let Some(stdout) = child.stdout.take() {
+    if let Some(stdout) = stdout_pipe {
         let reader = BufReader::new(stdout);
         let window_clone = window.clone();
         
@@ -378,7 +476,7 @@ if __name__ == '__main__':
     }
 
     // Drain stderr concurrently to prevent a full pipe from blocking the child.
-    if let Some(stderr) = child.stderr.take() {
+    if let Some(stderr) = stderr_pipe {
         thread::spawn(move || {
             for line in BufReader::new(stderr).lines() {
                 if let Ok(line) = line { eprintln!("[yt-dlp] {}", line); }
@@ -386,29 +484,62 @@ if __name__ == '__main__':
         });
     }
 
-    // Ждём завершения
-    let status = child.wait().map_err(|e| e.to_string())?;
+    // Poll without holding the mutex while sleeping so cancel_download can kill the child.
+    let status = loop {
+        let mut active = state.active_child.lock().map_err(|e| e.to_string())?;
+        let child = active.as_mut().ok_or_else(|| "Download process is unavailable".to_string())?;
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                active.take();
+                break status;
+            }
+            Ok(None) => {}
+            Err(error) => {
+                if let Some(mut child) = active.take() {
+                    let _ = child.kill();
+                }
+                let _ = std::fs::remove_file(&temp_script);
+                return Err(format!("Failed waiting for Python downloader: {}", error));
+            }
+        }
+        drop(active);
+        thread::sleep(Duration::from_millis(100));
+    };
 
-    // Удаляем временный файл
+    let was_cancelled = state.cancel_requested.swap(false, Ordering::SeqCst);
     let _ = std::fs::remove_file(temp_script);
 
-    if status.success() {
-        Ok("Download started".to_string())
+    if was_cancelled {
+        Ok("Download cancelled".to_string())
+    } else if status.success() {
+        Ok("Download completed".to_string())
     } else {
-        Err("Download failed".to_string())
+        Err("Download failed. Check the application log for yt-dlp details.".to_string())
     }
 }
 
 // Команда для отмены загрузки
 #[tauri::command]
-fn cancel_download() -> Result<String, String> {
-    // В реальной реализации нужно убить Python процесс
-    Ok("Cancelled".to_string())
+fn cancel_download(state: tauri::State<'_, DownloadState>) -> Result<String, String> {
+    let mut active = state.active_child.lock().map_err(|e| e.to_string())?;
+    match active.as_mut() {
+        Some(child) => match child.try_wait() {
+            Ok(Some(_)) => Ok("Download has already finished".to_string()),
+            Ok(None) => {
+                state.cancel_requested.store(true, Ordering::SeqCst);
+                terminate_download_process(child)?;
+                Ok("Cancellation requested".to_string())
+            }
+            Err(error) => Err(format!("Failed to inspect download process: {}", error)),
+        },
+        // The completion event may arrive just before the UI's cancel click.
+        None => Ok("No active download".to_string()),
+    }
 }
 
 // Команда для выбора папки сохранения
 #[tauri::command]
-async fn select_folder(window: Window) -> Result<String, String> {
+async fn select_folder() -> Result<String, String> {
     use tauri::api::dialog::blocking::FileDialogBuilder;
     
     let folder = FileDialogBuilder::new()
@@ -423,6 +554,10 @@ async fn select_folder(window: Window) -> Result<String, String> {
 
 fn main() {
     tauri::Builder::default()
+        .manage(DownloadState {
+            active_child: Mutex::new(None),
+            cancel_requested: AtomicBool::new(false),
+        })
         .invoke_handler(tauri::generate_handler![
             get_video_info,
             start_download,

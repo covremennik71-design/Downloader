@@ -1,44 +1,51 @@
 @echo off
+setlocal
 chcp 65001 >nul
+cd /d "%~dp0"
 
 echo ==========================================
 echo   YouTube Downloader - Dev Mode
 echo ==========================================
 echo.
 
-REM Check Python
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo ERROR: Python is not installed
-    pause
-    exit /b 1
+    echo ERROR: Python is not installed or is not in PATH.
+    goto :fail
 )
 
-REM Install dependencies
 echo Installing Python dependencies...
-pip install yt-dlp --quiet
+python -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo ERROR: Python dependency installation failed.
+    goto :fail
+)
 
-REM Check Rust
 rustc --version >nul 2>&1
 if errorlevel 1 (
-    echo ERROR: Rust is not installed
-    echo Please install from https://rustup.rs
-    pause
-    exit /b 1
+    echo ERROR: Rust is not installed. Install it from https://rustup.rs
+    goto :fail
 )
 
-REM Install cargo-tauri if needed
-cd src-tauri
 cargo tauri --version >nul 2>&1
 if errorlevel 1 (
-    echo Installing cargo-tauri...
+    echo Installing Tauri CLI 1.x...
     cargo install tauri-cli --version "^1.6"
+    if errorlevel 1 (
+        echo ERROR: Tauri CLI installation failed.
+        goto :fail
+    )
 )
 
-echo.
-echo Starting development server...
-echo.
+pushd "app\src-tauri"
 cargo tauri dev
+set "DEV_RESULT=%errorlevel%"
+popd
+if not "%DEV_RESULT%"=="0" goto :fail
+exit /b 0
 
-cd ..
+:fail
+echo.
+echo Development startup failed.
 pause
+exit /b 1
