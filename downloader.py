@@ -246,7 +246,8 @@ class YouTubeDownloader:
         return quality_map.get(quality, 'bestvideo+bestaudio/best')
     
     def download(self, url, quality, save_path, progress_callback=None, 
-                 info_callback=None, error_callback=None, complete_callback=None):
+                 info_callback=None, error_callback=None, complete_callback=None,
+                 cancel_callback=None):
         """Скачать видео."""
         url = normalize_youtube_url(url)
         save_path = os.path.abspath(os.path.expanduser(save_path))
@@ -367,7 +368,12 @@ class YouTubeDownloader:
                     complete_callback(filename, title)
                     
         except Exception as e:
-            if error_callback:
+            if self.cancel_flag:
+                if cancel_callback:
+                    cancel_callback()
+                elif info_callback:
+                    info_callback("Загрузка отменена")
+            elif error_callback:
                 error_callback(str(e))
         finally:
             self.is_downloading = False
@@ -924,6 +930,7 @@ class DownloaderApp(ctk.CTk):
                 'info_callback': self.on_info,
                 'error_callback': self.on_error,
                 'complete_callback': self.on_complete,
+                'cancel_callback': self.on_cancelled,
             }
         )
         thread.daemon = True
@@ -992,6 +999,16 @@ class DownloaderApp(ctk.CTk):
         
         self.after(0, update)
     
+    def on_cancelled(self):
+        """Restore controls after a user-requested cancellation."""
+        def update():
+            self.progress_frame.pack_forget()
+            self.download_btn.configure(state="normal")
+            self.cancel_btn.configure(state="disabled")
+            self.get_info_btn.configure(state="normal")
+            self.status_label.configure(text="Загрузка отменена", text_color="orange")
+        self.after(0, update)
+
     def cancel_download(self):
         """Отменить загрузку."""
         self.downloader.cancel()
