@@ -14,6 +14,8 @@ if not exist "%USERPROFILE%\.cargo\bin\rustc.exe" (
 set "PATH=%USERPROFILE%\.cargo\bin;%PATH%"
 where rustc >nul 2>nul || (echo ERROR: Rust not visible. Reopen terminal and rerun.& goto :fail)
 rustc --version
+where rustup >nul 2>nul && rustup update stable
+if errorlevel 1 (echo WARNING: Rust toolchain update was skipped or failed; continuing with installed compiler.)
 
 echo [3/5] Checking MSVC C++ Build Tools...
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
