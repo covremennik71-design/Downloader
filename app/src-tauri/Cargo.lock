@@ -583,8 +583,11 @@ dependencies = [
 name = "downloader"
 version = "1.0.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
+ "tokio",
 ]
 
 [[package]]
