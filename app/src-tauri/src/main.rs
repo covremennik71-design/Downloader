@@ -151,19 +151,28 @@ if __name__ == '__main__':
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
     
-    let output = cmd.output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    let output = match cmd.output() {
+        Ok(output) => output,
+        Err(error) => {
+            let _ = std::fs::remove_file(&temp_script);
+            return Err(format!("Failed to execute Python: {}", error));
+        }
+    };
 
     // Декодируем вывод как UTF-8
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
-    if !stderr.is_empty() && output.status.code() != Some(0) {
-        return Err(format!("Python error: {}", stderr));
-    }
+    // Always remove the temporary script, including when Python exits with an error.
+    let _ = std::fs::remove_file(&temp_script);
 
-    // Удаляем временный файл
-    let _ = std::fs::remove_file(temp_script);
+    if !output.status.success() {
+        return Err(if stderr.is_empty() {
+            format!("Python exited with status {}", output.status)
+        } else {
+            format!("Python error: {}", stderr)
+        });
+    }
 
     Ok(stdout.trim().to_string())
 }
