@@ -457,6 +457,9 @@ if __name__ == '__main__':
         *active = Some(child);
     }
 
+    // Do not expose cancellation until the child is registered in shared state.
+    let _ = window.emit("download-started", true);
+
     // Читаем вывод в реальном времени
     if let Some(stdout) = stdout_pipe {
         let reader = BufReader::new(stdout);
