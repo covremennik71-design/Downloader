@@ -66,6 +66,12 @@ function setupEventListeners() {
         }
     });
 
+    urlInput.addEventListener('input', () => {
+        videoInfo = null;
+        selectedQuality = null;
+        videoInfoSection.style.display = 'none';
+    });
+
     // Get info button
     getInfoBtn.addEventListener('click', handleGetInfo);
 
@@ -169,10 +175,12 @@ async function handleGetInfo() {
         return;
     }
 
-    if (!isValidYouTubeUrl(url)) {
-        alert('Please enter a valid YouTube URL');
+    const normalizedUrl = normalizeYouTubeUrl(url);
+    if (!normalizedUrl) {
+        alert('Please enter a valid YouTube URL (HTTP(S), youtube.com or youtu.be)');
         return;
     }
+    urlInput.value = normalizedUrl;
 
     showLoading(true);
     getInfoBtn.disabled = true;
@@ -430,15 +438,24 @@ function resetUI() {
 }
 
 // ===== Utility Functions =====
-function isValidYouTubeUrl(url) {
-    const patterns = [
-        /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/,
-        /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})/,
-        /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
-        /(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/
-    ];
-    
-    return patterns.some(pattern => pattern.test(url));
+function normalizeYouTubeUrl(value) {
+    try {
+        const raw = value.trim();
+        if (!raw || raw.startsWith('//')) return null;
+        const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : 'https://' + raw;
+        const parsed = new URL(candidate);
+        if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) return null;
+        if (parsed.port && !['80', '443'].includes(parsed.port)) return null;
+        const host = parsed.hostname.toLowerCase().replace(/\.$/, '');
+        if (!['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com','youtu.be','www.youtu.be'].includes(host)) return null;
+        let id = '';
+        if (host.endsWith('youtu.be')) id = parsed.pathname.split('/').filter(Boolean)[0] || '';
+        else if (parsed.pathname === '/watch') id = parsed.searchParams.get('v') || '';
+        else { const p = parsed.pathname.split('/').filter(Boolean); if (p.length === 2 && ['embed','shorts','live','v'].includes(p[0])) id = p[1]; }
+        if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null;
+        parsed.hash = '';
+        return parsed.toString();
+    } catch (_) { return null; }
 }
 
 function formatDuration(seconds) {

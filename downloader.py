@@ -19,6 +19,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import customtkinter as ctk
 from datetime import timedelta
+from url_utils import normalize_youtube_url
 
 # Путь к конфигу
 def get_base_dir():
@@ -138,6 +139,7 @@ class YouTubeDownloader:
     
     def get_video_info(self, url):
         """Получить информацию о видео."""
+        url = normalize_youtube_url(url)
         import yt_dlp
         
         ydl_opts = {
@@ -241,6 +243,9 @@ class YouTubeDownloader:
     def download(self, url, quality, save_path, progress_callback=None, 
                  info_callback=None, error_callback=None, complete_callback=None):
         """Скачать видео."""
+        url = normalize_youtube_url(url)
+        save_path = os.path.abspath(os.path.expanduser(save_path))
+        os.makedirs(save_path, exist_ok=True)
         import yt_dlp
         
         self.is_downloading = True
@@ -620,10 +625,14 @@ class DownloaderApp(ctk.CTk):
             messagebox.showwarning("Ошибка", "Введите ссылку на видео!")
             return
         
-        if 'youtube.com' not in url and 'youtu.be' not in url:
-            messagebox.showwarning("Ошибка", "Это не ссылка на YouTube видео!")
+        try:
+            url = normalize_youtube_url(url)
+            self.url_entry.delete(0, tk.END)
+            self.url_entry.insert(0, url)
+        except ValueError as exc:
+            messagebox.showwarning("Ошибка", str(exc))
             return
-        
+        self.current_info = None
         self.status_label.configure(text="Получение информации...", text_color="orange")
         self.get_info_btn.configure(state="disabled")
         
@@ -687,8 +696,15 @@ class DownloaderApp(ctk.CTk):
         if self.downloader.is_downloading:
             messagebox.showinfo("Информация", "Загрузка уже идёт!")
             return
-        
-        # Если информация ещё не получена - получаем её
+        try:
+            url = normalize_youtube_url(url)
+            self.url_entry.delete(0, tk.END)
+            self.url_entry.insert(0, url)
+        except ValueError as exc:
+            messagebox.showwarning("Ошибка", str(exc))
+            return
+        if self.current_info is None:
+            # Получаем информацию для текущего нормализованного URL.
         if self.current_info is None:
             self.status_label.configure(text="Получение информации о видео...", text_color="orange")
             self.download_btn.configure(state="disabled")
