@@ -50,6 +50,19 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertNotIn("Python314", build)
         self.assertIn("Invoke-WebRequest", ffmpeg)
 
+    def test_unused_tauri_capabilities_are_disabled(self):
+        cargo = Path("app/src-tauri/Cargo.toml").read_text(encoding="utf-8")
+        config = Path("app/src-tauri/tauri.conf.json").read_text(encoding="utf-8")
+        self.assertNotIn("shell-all", cargo)
+        self.assertNotIn("path-all", cargo)
+        self.assertNotIn("fs-all", cargo)
+        self.assertNotIn('"shell":', config)
+        self.assertNotIn('"fs":', config)
+
+    def test_python_launcher_uses_the_same_interpreter_for_pip(self):
+        launcher = Path("run.bat").read_text(encoding="utf-8")
+        self.assertIn("python -m pip install -r requirements.txt", launcher)
+
 
 if __name__ == "__main__":
     unittest.main()
