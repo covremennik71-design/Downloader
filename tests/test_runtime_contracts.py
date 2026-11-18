@@ -28,7 +28,7 @@ class RuntimeContractTests(unittest.TestCase):
 
     def test_tauri_cancel_kills_the_child_process(self):
         source = Path("app/src-tauri/src/main.rs").read_text(encoding="utf-8")
-        self.assertIn("static ACTIVE_DOWNLOAD", source)
+        self.assertIn("active_child: Mutex", source)
         self.assertIn("child.kill()", source)
         self.assertNotIn("В реальной реализации нужно убить Python процесс", source)
 
