@@ -395,6 +395,11 @@ async function handleDownload() {
             formatType: selectedFormat,
             savePath: savePath
         });
+        // The final stdout event is asynchronous; the command result is a fallback
+        // so a delayed/missed event cannot leave the UI stuck in the progress state.
+        if (isDownloading) {
+            handleDownloadComplete({ title: videoInfo?.title || 'Video' });
+        }
     } catch (err) {
         console.error('Download failed:', err);
         handleDownloadError(err);
@@ -423,6 +428,7 @@ function updateProgress(data) {
 }
 
 function handleDownloadComplete(data) {
+    if (!isDownloading) return;
     isDownloading = false;
     progressSection.style.display = 'none';
     successSection.style.display = 'block';
