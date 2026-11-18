@@ -23,3 +23,11 @@ jobs:
           node-version: "22"
       - name: Check frontend JavaScript syntax
         run: node --check app/src/main.js
+
+  rust-check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check Tauri backend
+        run: cargo check --manifest-path app/src-tauri/Cargo.toml
