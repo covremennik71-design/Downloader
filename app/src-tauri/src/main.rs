@@ -6,7 +6,13 @@
 use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
 use std::thread;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 use tauri::{Manager, Window};
+
+static ACTIVE_DOWNLOAD: Mutex<Option<std::process::Child>> = Mutex::new(None);
+static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -360,7 +366,21 @@ if __name__ == '__main__':
     cmd.creation_flags(CREATE_NO_WINDOW);
     
     let mut child = cmd.spawn()
-        .map_err(|e| format!("Failed to start Python: {}", e))?;
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&temp_script);
+            format!("Failed to start Python: {}", e)
+        })?;
+
+    {
+        let mut active = ACTIVE_DOWNLOAD.lock().map_err(|e| e.to_string())?;
+        if active.is_some() {
+            let _ = child.kill();
+            let _ = std::fs::remove_file(&temp_script);
+            return Err("A download is already running".to_string());
+        }
+        CANCEL_REQUESTED.store(false, Ordering::SeqCst);
+        *active = Some(child);
+    }
 
     // Читаем вывод в реальном времени
     if let Some(stdout) = child.stdout.take() {
@@ -386,24 +406,52 @@ if __name__ == '__main__':
         });
     }
 
-    // Ждём завершения
-    let status = child.wait().map_err(|e| e.to_string())?;
+    // Poll without holding the mutex while sleeping so cancel_download can kill the child.
+    let status = loop {
+        let mut active = ACTIVE_DOWNLOAD.lock().map_err(|e| e.to_string())?;
+        let child = active.as_mut().ok_or_else(|| "Download process is unavailable".to_string())?;
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                active.take();
+                break status;
+            }
+            Ok(None) => {}
+            Err(error) => {
+                if let Some(mut child) = active.take() {
+                    let _ = child.kill();
+                }
+                let _ = std::fs::remove_file(&temp_script);
+                return Err(format!("Failed waiting for Python downloader: {}", error));
+            }
+        }
+        drop(active);
+        thread::sleep(Duration::from_millis(100));
+    };
 
-    // Удаляем временный файл
+    let was_cancelled = CANCEL_REQUESTED.swap(false, Ordering::SeqCst);
     let _ = std::fs::remove_file(temp_script);
 
-    if status.success() {
-        Ok("Download started".to_string())
+    if was_cancelled {
+        Ok("Download cancelled".to_string())
+    } else if status.success() {
+        Ok("Download completed".to_string())
     } else {
-        Err("Download failed".to_string())
+        Err("Download failed. Check the application log for yt-dlp details.".to_string())
     }
 }
 
 // Команда для отмены загрузки
 #[tauri::command]
 fn cancel_download() -> Result<String, String> {
-    // В реальной реализации нужно убить Python процесс
-    Ok("Cancelled".to_string())
+    let mut active = ACTIVE_DOWNLOAD.lock().map_err(|e| e.to_string())?;
+    match active.as_mut() {
+        Some(child) => {
+            CANCEL_REQUESTED.store(true, Ordering::SeqCst);
+            child.kill().map_err(|e| format!("Failed to cancel download: {}", e))?;
+            Ok("Cancellation requested".to_string())
+        }
+        None => Err("No active download".to_string()),
+    }
 }
 
 // Команда для выбора папки сохранения
