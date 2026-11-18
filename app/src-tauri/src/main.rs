@@ -5,20 +5,14 @@
 
 use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
-use std::sync::{Arc, Mutex};
 use std::thread;
-use tauri::{Manager, Window, State};
+use tauri::{Manager, Window};
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-// Структура для хранения состояния загрузки
-struct DownloadState {
-    is_downloading: bool,
-}
 
 // Команда для получения информации о видео
 #[tauri::command]
@@ -28,6 +22,26 @@ import sys
 import json
 import yt_dlp
 
+def normalize_youtube_url(value):
+    from urllib.parse import urlsplit, parse_qs
+    import re
+    if not isinstance(value,str) or not value.strip(): raise ValueError('URL is empty')
+    value=value.strip()
+    if value.startswith('//'): raise ValueError('Invalid YouTube URL')
+    parsed=urlsplit(value if '://' in value else 'https://'+value)
+    if parsed.scheme.lower() not in ('http','https'): raise ValueError('Only HTTP and HTTPS URLs are allowed')
+    host=(parsed.hostname or '').lower().rstrip('.')
+    allowed={'youtube.com','www.youtube.com','m.youtube.com','music.youtube.com','youtu.be','www.youtu.be'}
+    if host not in allowed or parsed.username or parsed.password: raise ValueError('Only valid YouTube URLs are allowed')
+    if parsed.port is not None and parsed.port not in (80,443): raise ValueError('Unsupported URL port')
+    if host.endswith('youtu.be'): video_id=parsed.path.strip('/').split('/')[0]
+    elif parsed.path=='/watch': video_id=parse_qs(parsed.query).get('v',[''])[0]
+    else:
+        parts=[p for p in parsed.path.split('/') if p]
+        video_id=parts[1] if len(parts)==2 and parts[0] in ('embed','shorts','live','v') else ''
+    if not re.fullmatch(r'[A-Za-z0-9_-]{11}',video_id): raise ValueError('Invalid YouTube video URL')
+    return value if '://' in value else 'https://'+value
+
 # Принудительно устанавливаем UTF-8 кодировку для stdout
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
@@ -35,6 +49,7 @@ if sys.stderr.encoding != 'utf-8':
     sys.stderr.reconfigure(encoding='utf-8')
 
 def get_info(url):
+    url = normalize_youtube_url(url)
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
@@ -94,7 +109,7 @@ if __name__ == '__main__':
 "#;
 
     // Записываем скрипт во временный файл
-    let temp_script = std::env::temp_dir().join("yt_info.py");
+    let temp_script = std::env::temp_dir().join(format!("yt_info_{}_{}.py", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos()));
     std::fs::write(&temp_script, python_script).map_err(|e| e.to_string())?;
 
     // Запускаем Python скрипт с скрытым окном и UTF-8 кодировкой
@@ -162,6 +177,26 @@ import json
 import os
 import yt_dlp
 
+def normalize_youtube_url(value):
+    from urllib.parse import urlsplit, parse_qs
+    import re
+    if not isinstance(value,str) or not value.strip(): raise ValueError('URL is empty')
+    value=value.strip()
+    if value.startswith('//'): raise ValueError('Invalid YouTube URL')
+    parsed=urlsplit(value if '://' in value else 'https://'+value)
+    if parsed.scheme.lower() not in ('http','https'): raise ValueError('Only HTTP and HTTPS URLs are allowed')
+    host=(parsed.hostname or '').lower().rstrip('.')
+    allowed={'youtube.com','www.youtube.com','m.youtube.com','music.youtube.com','youtu.be','www.youtu.be'}
+    if host not in allowed or parsed.username or parsed.password: raise ValueError('Only valid YouTube URLs are allowed')
+    if parsed.port is not None and parsed.port not in (80,443): raise ValueError('Unsupported URL port')
+    if host.endswith('youtu.be'): video_id=parsed.path.strip('/').split('/')[0]
+    elif parsed.path=='/watch': video_id=parse_qs(parsed.query).get('v',[''])[0]
+    else:
+        parts=[p for p in parsed.path.split('/') if p]
+        video_id=parts[1] if len(parts)==2 and parts[0] in ('embed','shorts','live','v') else ''
+    if not re.fullmatch(r'[A-Za-z0-9_-]{11}',video_id): raise ValueError('Invalid YouTube video URL')
+    return value if '://' in value else 'https://'+value
+
 # Принудительно устанавливаем UTF-8 кодировку для stdout
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
@@ -223,6 +258,9 @@ def progress_hook(d):
         print(json.dumps(data, ensure_ascii=False), flush=True)
 
 def download(url, quality, format_type, save_path, ffmpeg_arg=None):
+    url = normalize_youtube_url(url)
+    save_path = os.path.abspath(os.path.expanduser(save_path))
+    os.makedirs(save_path, exist_ok=True)
     ffmpeg_dir = find_ffmpeg(ffmpeg_arg)
     has_ffmpeg = ffmpeg_dir is not None and os.path.exists(os.path.join(ffmpeg_dir, 'ffmpeg.exe'))
     
@@ -301,7 +339,7 @@ if __name__ == '__main__':
 "#;
 
     // Записываем скрипт во временный файл
-    let temp_script = std::env::temp_dir().join("yt_download.py");
+    let temp_script = std::env::temp_dir().join(format!("yt_download_{}_{}.py", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos()));
     std::fs::write(&temp_script, python_script).map_err(|e| e.to_string())?;
 
     // Запускаем Python скрипт с выводом в реальном времени и скрытым окном
@@ -335,6 +373,15 @@ if __name__ == '__main__':
                     // Отправляем прогресс в frontend
                     let _ = window_clone.emit("download-progress", &line);
                 }
+            }
+        });
+    }
+
+    // Drain stderr concurrently to prevent a full pipe from blocking the child.
+    if let Some(stderr) = child.stderr.take() {
+        thread::spawn(move || {
+            for line in BufReader::new(stderr).lines() {
+                if let Ok(line) = line { eprintln!("[yt-dlp] {}", line); }
             }
         });
     }
