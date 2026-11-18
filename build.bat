@@ -1,112 +1,110 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
+chcp 65001 >nul
+cd /d "%~dp0"
+set "ROOT=%~dp0"
 
 echo ==========================================
-echo   YouTube Downloader - Build Script
-echo   Tauri + Python Edition
+echo   YouTube Downloader - Tauri Build
 echo ==========================================
 echo.
 
-:: [1/8] Checking Python installation
-echo [1/8] Checking Python installation...
+echo [1/6] Checking Python...
 python --version >nul 2>&1
-if !errorlevel! neq 0 (
-    echo ERROR: Python not found!
-    pause
-    exit /b 1
+if errorlevel 1 (
+    echo ERROR: Python was not found in PATH.
+    goto :fail
 )
-echo OK: Python found
+python -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo ERROR: Python dependency installation failed.
+    goto :fail
+)
 
-:: [2/8] Fixing pip warnings and installing dependencies
-echo [2/8] Installing Python dependencies...
-for /d %%i in ("%LOCALAPPDATA%\Programs\Python\Python314\Lib\site-packages\~*") do rmdir /s /q "%%i" 2>nul
-pip install --upgrade --force-reinstall yt-dlp --quiet
-echo OK: Python dependencies installed
-
-:: [3/8] Checking Rust installation
-echo [3/8] Checking Rust installation...
+echo [2/6] Checking Rust toolchain...
 rustc --version >nul 2>&1
-if !errorlevel! neq 0 (
-    echo ERROR: Rust not found!
-    pause
-    exit /b 1
+if errorlevel 1 (
+    echo ERROR: Rust was not found. Install it from https://rustup.rs
+    goto :fail
 )
-echo OK: Rust found
+cargo --version >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Cargo was not found.
+    goto :fail
+)
 
-:: [4/8] Checking Tauri CLI
-echo [4/8] Checking Tauri CLI...
+echo [3/6] Checking Tauri CLI...
 cargo tauri --version >nul 2>&1
-if !errorlevel! neq 0 (
-    echo Tauri CLI not found. Installing...
-    cargo install tauri-cli
-    if !errorlevel! neq 0 (
-        echo ERROR: Failed to install Tauri CLI
-        pause
-        exit /b 1
+if errorlevel 1 (
+    echo Installing Tauri CLI 1.x...
+    cargo install tauri-cli --version "^1.6"
+    if errorlevel 1 (
+        echo ERROR: Failed to install Tauri CLI.
+        goto :fail
     )
 )
-echo OK: Tauri CLI ready
 
-:: [5/8] Downloading FFmpeg (CRITICAL FOR VIDEO+AUDIO MERGING)
-echo [5/8] Downloading FFmpeg...
-if not exist "app\ffmpeg" mkdir "app\ffmpeg"
+echo [4/6] Checking FFmpeg...
 if not exist "app\ffmpeg\bin\ffmpeg.exe" (
-    echo FFmpeg not found. Downloading...
-    powershell -Command "& {Invoke-WebRequest -Uri 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip' -OutFile 'app\ffmpeg.zip'}"
-    if !errorlevel! neq 0 (
-        echo ERROR: Failed to download FFmpeg
-        pause
-        exit /b 1
-    )
-    echo Extracting FFmpeg...
-    powershell -Command "& {Expand-Archive -Path 'app\ffmpeg.zip' -DestinationPath 'app\ffmpeg' -Force}"
-    if !errorlevel! neq 0 (
-        echo ERROR: Failed to extract FFmpeg
-        pause
-        exit /b 1
-    )
-    :: Move files to correct location
-    if exist "app\ffmpeg\ffmpeg-master-latest-win64-gpl\bin" (
-        move "app\ffmpeg\ffmpeg-master-latest-win64-gpl\bin" "app\ffmpeg\bin" >nul
-        rmdir /s /q "app\ffmpeg\ffmpeg-master-latest-win64-gpl" >nul
-    )
-    del "app\ffmpeg.zip" >nul 2>&1
+    echo FFmpeg is missing. Run download_ffmpeg.bat first, then copy
+    echo ffmpeg\bin\ffmpeg.exe and ffprobe.exe into app\ffmpeg\bin\.
+    if not exist "app\ffmpeg\bin" mkdir "app\ffmpeg\bin"
+    if exist "ffmpeg\bin\ffmpeg.exe" copy /Y "ffmpeg\bin\ffmpeg.exe" "app\ffmpeg\bin\ffmpeg.exe" >nul
+    if exist "ffmpeg\bin\ffprobe.exe" copy /Y "ffmpeg\bin\ffprobe.exe" "app\ffmpeg\bin\ffprobe.exe" >nul
 )
-echo OK: FFmpeg ready
+if not exist "app\ffmpeg\bin\ffmpeg.exe" (
+    echo WARNING: FFmpeg not found. Video/audio merging and MP3 conversion will be unavailable.
+) else (
+    echo FFmpeg found.
+)
 
-:: [6/8] Generating Icon
-echo [6/8] Checking application icon...
-if not exist "app\src-tauri\icons" mkdir "app\src-tauri\icons"
+echo [5/6] Checking application icon...
 if not exist "app\src-tauri\icons\icon.ico" (
-    echo Icon not found. Generating...
     python app\generate_icon.py
+    if errorlevel 1 (
+        echo ERROR: Icon generation failed.
+        goto :fail
+    )
 )
-echo OK: Icon ready
-
-:: [7/8] Building Tauri application
-echo [7/8] Building Tauri application...
-cd app\src-tauri
-cargo build --release
-if !errorlevel! neq 0 (
-    echo ERROR: Build failed!
-    cd ..\..
-    pause
-    exit /b 1
+if not exist "app\src-tauri\icons\icon.ico" (
+    echo ERROR: Required Tauri icon was not created.
+    goto :fail
 )
-cd ..\..
 
-:: [8/8] Copying EXE and FFmpeg to root
-echo [8/8] Copying files to root...
+echo [6/6] Building Tauri executable...
+pushd "app\src-tauri"
+cargo tauri build --no-bundle
+set "BUILD_RESULT=%errorlevel%"
+popd
+if not "%BUILD_RESULT%"=="0" (
+    echo ERROR: Tauri build failed.
+    goto :fail
+)
+
+if not exist "app\src-tauri\target\release\downloader.exe" (
+    echo ERROR: Build completed but downloader.exe was not found.
+    goto :fail
+)
 copy /Y "app\src-tauri\target\release\downloader.exe" "YouTube Downloader.exe" >nul
-if not exist "ffmpeg" mkdir "ffmpeg"
-if not exist "ffmpeg\bin" mkdir "ffmpeg\bin"
-copy /Y "app\ffmpeg\bin\ffmpeg.exe" "ffmpeg\bin\ffmpeg.exe" >nul
-copy /Y "app\ffmpeg\bin\ffprobe.exe" "ffmpeg\bin\ffprobe.exe" >nul
+if errorlevel 1 (
+    echo ERROR: Could not copy the executable.
+    goto :fail
+)
+
+if exist "app\ffmpeg\bin\ffmpeg.exe" (
+    if not exist "ffmpeg\bin" mkdir "ffmpeg\bin"
+    copy /Y "app\ffmpeg\bin\ffmpeg.exe" "ffmpeg\bin\ffmpeg.exe" >nul
+    if exist "app\ffmpeg\bin\ffprobe.exe" copy /Y "app\ffmpeg\bin\ffprobe.exe" "ffmpeg\bin\ffprobe.exe" >nul
+)
 
 echo.
-echo ==========================================
-echo   BUILD SUCCESSFUL!
-echo   EXE location: YouTube Downloader.exe
-echo   FFmpeg location: ffmpeg\bin\
-echo ==========================================
+echo BUILD SUCCEEDED: "%ROOT%YouTube Downloader.exe"
+echo Note: the Tauri executable still requires Python and yt-dlp on the target machine.
 pause
+exit /b 0
+
+:fail
+echo.
+echo BUILD FAILED. No success status was reported.
+pause
+exit /b 1
