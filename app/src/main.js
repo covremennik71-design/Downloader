@@ -147,7 +147,7 @@ function loadConfig() {
             config = { ...config, ...JSON.parse(saved) };
         }
         // Migrate the old developer-machine default instead of exposing a dead path.
-        if (/^C:\\\\Users\\\\Smixr\\\\/i.test(config.defaultPath || '')) {
+        if (/^C:\\Users\\Smixr\\/i.test(config.defaultPath || '')) {
             config.defaultPath = 'downloads';
             localStorage.setItem('downloader_config', JSON.stringify(config));
         }
