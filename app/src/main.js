@@ -181,11 +181,6 @@ function loadConfig() {
         if (saved) {
             config = { ...config, ...JSON.parse(saved) };
         }
-        // Migrate the old developer-machine default instead of exposing a dead path.
-        if (/^C:\\Users\\Smixr\\/i.test(config.defaultPath || '')) {
-            config.defaultPath = 'downloads';
-            localStorage.setItem('downloader_config', JSON.stringify(config));
-        }
         savePathInput.value = config.defaultPath || 'downloads';
         if (apiKeyInput) apiKeyInput.value = config.apiKey || '';
         if (defaultPathInput) defaultPathInput.value = config.defaultPath || 'downloads';
