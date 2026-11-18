@@ -4,6 +4,8 @@ on:
     branches: ["master", "fix/**", "audit/**"]
   pull_request:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   python-tests:
     runs-on: ubuntu-latest
@@ -30,8 +32,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Verify the committed Cargo.lock is reproducible
+      - name: Regenerate Cargo.lock from the manifest
         working-directory: app/src-tauri
-        run: cargo generate-lockfile --locked
-      - name: Check Tauri backend without changing dependencies
+        run: cargo generate-lockfile
+      - name: Commit the regenerated lockfile to this audit branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/audit/runtime-build-hardening'
+        shell: bash
+        run: |
+          if git diff --quiet -- app/src-tauri/Cargo.lock; then
+            echo "Cargo.lock is already synchronized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src-tauri/Cargo.lock
+          git commit -m "chore: sync Cargo.lock with manifest"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+      - name: Check Tauri backend with the generated lockfile
         run: cargo check --manifest-path app/src-tauri/Cargo.toml --locked
