@@ -71,6 +71,15 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertIn("browseDefaultBtn.addEventListener('click'", source)
         self.assertIn("if (folder) defaultPathInput.value = folder", source)
 
+    def test_tauri_cancel_is_enabled_only_after_child_registration(self):
+        frontend = Path("app/src/main.js").read_text(encoding="utf-8")
+        backend = Path("app/src-tauri/src/main.rs").read_text(encoding="utf-8")
+        self.assertIn("listen('download-started'", frontend)
+        self.assertIn("cancelBtn.disabled = true", frontend)
+        self.assertIn('window.emit("download-started", true)', backend)
+        self.assertIn("activeDownloadPromise", frontend)
+        self.assertIn("cancelCommandPromise", frontend)
+
     def test_tauri_metadata_requests_ignore_stale_responses(self):
         source = Path("app/src/main.js").read_text(encoding="utf-8")
         self.assertIn("let infoRequestSequence = 0", source)
