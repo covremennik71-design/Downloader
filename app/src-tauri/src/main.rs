@@ -8,7 +8,7 @@ use std::io::{BufRead, BufReader};
 use std::thread;
 use std::sync::{Mutex, atomic::{AtomicBool, Ordering}};
 use std::time::Duration;
-use tauri::{Manager, Window};
+use tauri::{Window};
 
 struct DownloadState {
     active_child: Mutex<Option<std::process::Child>>,
@@ -23,7 +23,7 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 // Команда для получения информации о видео
 #[tauri::command]
-fn get_video_info(window: Window, url: String) -> Result<String, String> {
+fn get_video_info(url: String) -> Result<String, String> {
     let python_script = r#"
 import sys
 import json
@@ -380,6 +380,10 @@ if __name__ == '__main__':
             format!("Failed to start Python: {}", e)
         })?;
 
+    // Detach both pipes before moving Child into shared state.
+    let stdout_pipe = child.stdout.take();
+    let stderr_pipe = child.stderr.take();
+
     {
         let mut active = state.active_child.lock().map_err(|e| e.to_string())?;
         if active.is_some() {
@@ -392,7 +396,7 @@ if __name__ == '__main__':
     }
 
     // Читаем вывод в реальном времени
-    if let Some(stdout) = child.stdout.take() {
+    if let Some(stdout) = stdout_pipe {
         let reader = BufReader::new(stdout);
         let window_clone = window.clone();
         
@@ -407,7 +411,7 @@ if __name__ == '__main__':
     }
 
     // Drain stderr concurrently to prevent a full pipe from blocking the child.
-    if let Some(stderr) = child.stderr.take() {
+    if let Some(stderr) = stderr_pipe {
         thread::spawn(move || {
             for line in BufReader::new(stderr).lines() {
                 if let Ok(line) = line { eprintln!("[yt-dlp] {}", line); }
@@ -465,7 +469,7 @@ fn cancel_download(state: tauri::State<'_, DownloadState>) -> Result<String, Str
 
 // Команда для выбора папки сохранения
 #[tauri::command]
-async fn select_folder(window: Window) -> Result<String, String> {
+async fn select_folder() -> Result<String, String> {
     use tauri::api::dialog::blocking::FileDialogBuilder;
     
     let folder = FileDialogBuilder::new()
