@@ -28,8 +28,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Verify the committed Cargo.lock is reproducible
-        working-directory: app/src-tauri
-        run: cargo generate-lockfile --locked
       - name: Check Tauri backend without changing dependencies
         run: cargo check --manifest-path app/src-tauri/Cargo.toml --locked
