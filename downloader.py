@@ -617,7 +617,7 @@ class DownloaderApp(ctk.CTk):
     
     def check_api_key(self):
         """Explain that yt-dlp downloads do not require a YouTube Data API key."""
-        self.api_label.configure(text="YouTube Data API key is not required for downloads")
+        self.api_label.configure(text="Ключ YouTube Data API не нужен для загрузки")
     
     def browse_folder(self):
         """Выбрать папку для сохранения."""
