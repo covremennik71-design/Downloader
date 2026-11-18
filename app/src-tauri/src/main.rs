@@ -6,13 +6,14 @@
 use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
 use std::thread;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, atomic::{AtomicBool, Ordering}};
 use std::time::Duration;
 use tauri::{Manager, Window};
 
-static ACTIVE_DOWNLOAD: Mutex<Option<std::process::Child>> = Mutex::new(None);
-static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
+struct DownloadState {
+    active_child: Mutex<Option<std::process::Child>>,
+    cancel_requested: AtomicBool,
+}
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -151,6 +152,7 @@ if __name__ == '__main__':
 #[tauri::command]
 fn start_download(
     window: Window,
+    state: tauri::State<'_, DownloadState>,
     url: String,
     quality: String,
     format_type: String,
@@ -379,13 +381,13 @@ if __name__ == '__main__':
         })?;
 
     {
-        let mut active = ACTIVE_DOWNLOAD.lock().map_err(|e| e.to_string())?;
+        let mut active = state.active_child.lock().map_err(|e| e.to_string())?;
         if active.is_some() {
             let _ = child.kill();
             let _ = std::fs::remove_file(&temp_script);
             return Err("A download is already running".to_string());
         }
-        CANCEL_REQUESTED.store(false, Ordering::SeqCst);
+        state.cancel_requested.store(false, Ordering::SeqCst);
         *active = Some(child);
     }
 
@@ -415,7 +417,7 @@ if __name__ == '__main__':
 
     // Poll without holding the mutex while sleeping so cancel_download can kill the child.
     let status = loop {
-        let mut active = ACTIVE_DOWNLOAD.lock().map_err(|e| e.to_string())?;
+        let mut active = state.active_child.lock().map_err(|e| e.to_string())?;
         let child = active.as_mut().ok_or_else(|| "Download process is unavailable".to_string())?;
         match child.try_wait() {
             Ok(Some(status)) => {
@@ -435,7 +437,7 @@ if __name__ == '__main__':
         thread::sleep(Duration::from_millis(100));
     };
 
-    let was_cancelled = CANCEL_REQUESTED.swap(false, Ordering::SeqCst);
+    let was_cancelled = state.cancel_requested.swap(false, Ordering::SeqCst);
     let _ = std::fs::remove_file(temp_script);
 
     if was_cancelled {
@@ -449,11 +451,11 @@ if __name__ == '__main__':
 
 // Команда для отмены загрузки
 #[tauri::command]
-fn cancel_download() -> Result<String, String> {
-    let mut active = ACTIVE_DOWNLOAD.lock().map_err(|e| e.to_string())?;
+fn cancel_download(state: tauri::State<'_, DownloadState>) -> Result<String, String> {
+    let mut active = state.active_child.lock().map_err(|e| e.to_string())?;
     match active.as_mut() {
         Some(child) => {
-            CANCEL_REQUESTED.store(true, Ordering::SeqCst);
+            state.cancel_requested.store(true, Ordering::SeqCst);
             child.kill().map_err(|e| format!("Failed to cancel download: {}", e))?;
             Ok("Cancellation requested".to_string())
         }
@@ -478,6 +480,10 @@ async fn select_folder(window: Window) -> Result<String, String> {
 
 fn main() {
     tauri::Builder::default()
+        .manage(DownloadState {
+            active_child: Mutex::new(None),
+            cancel_requested: AtomicBool::new(false),
+        })
         .invoke_handler(tauri::generate_handler![
             get_video_info,
             start_download,
