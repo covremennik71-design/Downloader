@@ -50,8 +50,12 @@ if errorlevel 1 (
 )
 where ffmpeg >nul 2>nul || (echo FFmpeg PATH not refreshed. Reopen terminal and rerun.& goto :fail)
 
-if not exist "%USERPROFILE%\.cargo\bin\cargo-tauri.exe" (
-  cargo install tauri-cli --version 1.6.6 --locked
+set "TAURI_VERSION="
+for /f "tokens=*" %%V in ('cargo tauri --version 2^>nul') do set "TAURI_VERSION=%%V"
+echo %TAURI_VERSION% | findstr /c:"1.6.6" >nul
+if errorlevel 1 (
+  echo Installing or updating pinned Tauri CLI 1.6.6...
+  cargo install tauri-cli --version 1.6.6 --locked --force
   if errorlevel 1 (echo ERROR: Tauri CLI installation failed.& goto :fail)
 )
 cargo tauri --version
