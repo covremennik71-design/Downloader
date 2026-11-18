@@ -118,6 +118,11 @@ def load_config():
             print(f"Ошибка загрузки конфига: {e}")
     else:
         save_config(config)
+
+    configured_path = config.get("download_path") or DOWNLOADS_DIR
+    if not os.path.isabs(configured_path):
+        configured_path = os.path.join(BASE_DIR, configured_path)
+    config["download_path"] = os.path.normpath(configured_path)
     return config
 
 def save_config(config):
@@ -649,18 +654,8 @@ class DownloaderApp(ctk.CTk):
         """Поток для получения информации."""
         try:
             info = self.downloader.get_video_info(url)
-            self.current_info = info
-            
-            # Обновляем список качеств
+            # Build the UI payload in the worker, but update widgets only on Tk's main thread.
             qualities = self.downloader.get_available_qualities(info)
-            self.quality_combo.configure(values=qualities)
-            if qualities:
-                # Устанавливаем рекомендуемое качество
-                default = self.config.get("default_quality", "720p")
-                if default in qualities:
-                    self.quality_combo.set(default)
-                else:
-                    self.quality_combo.set(qualities[-3] if len(qualities) >= 3 else qualities[0])
             
             # Показываем информацию
             duration = info.get('duration', 0)
@@ -673,13 +668,28 @@ class DownloaderApp(ctk.CTk):
                 f"🎬 Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}"
             )
             
-            self.after(0, lambda: self._show_info(info_text))
+            self.after(0, lambda: self._show_info(info_text, info, qualities, url))
             
         except Exception as e:
             self.after(0, lambda: self._show_error(str(e)))
     
-    def _show_info(self, text):
-        """Показать информацию о видео."""
+    def _apply_qualities(self, qualities):
+        """Apply quality choices on the Tk main thread."""
+        self.quality_combo.configure(values=qualities)
+        if qualities:
+            default = self.config.get("default_quality", "720p")
+            if default in qualities:
+                self.quality_combo.set(default)
+            else:
+                self.quality_combo.set(qualities[-3] if len(qualities) >= 3 else qualities[0])
+
+    def _show_info(self, text, info, qualities, requested_url):
+        """Показать информацию о видео на главном потоке Tk."""
+        if self.url_entry.get().strip() != requested_url:
+            self.get_info_btn.configure(state="normal")
+            return
+        self.current_info = info
+        self._apply_qualities(qualities)
         self.info_label.configure(text=text)
         self.info_frame.pack(fill="x", pady=10)
         self.status_label.configure(text="Информация получена", text_color="green")
@@ -725,17 +735,8 @@ class DownloaderApp(ctk.CTk):
         """Получить информацию и показать диалог выбора качества."""
         try:
             info = self.downloader.get_video_info(url)
-            self.current_info = info
-            
-            # Обновляем список качеств
+            # Keep all Tk widget access in the main-thread callback.
             qualities = self.downloader.get_available_qualities(info)
-            self.quality_combo.configure(values=qualities)
-            if qualities:
-                default = self.config.get("default_quality", "720p")
-                if default in qualities:
-                    self.quality_combo.set(default)
-                else:
-                    self.quality_combo.set(qualities[-3] if len(qualities) >= 3 else qualities[0])
             
             # Показываем информацию в основном окне
             duration = info.get('duration', 0)
@@ -748,13 +749,19 @@ class DownloaderApp(ctk.CTk):
                 f"🎬 Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}"
             )
             
-            self.after(0, lambda: self._show_info_and_dialog(info_text, qualities))
+            self.after(0, lambda: self._show_info_and_dialog(info_text, info, qualities, url))
             
         except Exception as e:
             self.after(0, lambda: self._show_error(str(e)))
     
-    def _show_info_and_dialog(self, info_text, qualities):
-        """Показать информацию и диалог выбора качества."""
+    def _show_info_and_dialog(self, info_text, info, qualities, requested_url):
+        """Показать информацию и диалог выбора качества на главном потоке Tk."""
+        if self.url_entry.get().strip() != requested_url:
+            self.download_btn.configure(state="normal")
+            self.get_info_btn.configure(state="normal")
+            return
+        self.current_info = info
+        self._apply_qualities(qualities)
         self.info_label.configure(text=info_text)
         self.info_frame.pack(fill="x", pady=10)
         self.status_label.configure(text="Информация получена", text_color="green")
