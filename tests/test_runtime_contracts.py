@@ -58,6 +58,8 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertNotIn("fs-all", cargo)
         self.assertNotIn('"shell":', config)
         self.assertNotIn('"fs":', config)
+        self.assertNotIn('"csp": null', config)
+        self.assertIn("script-src 'self'", config)
 
     def test_python_launcher_uses_the_same_interpreter_for_pip(self):
         launcher = Path("run.bat").read_text(encoding="utf-8")
