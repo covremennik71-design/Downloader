@@ -22,9 +22,11 @@ class RuntimeContractTests(unittest.TestCase):
                         isinstance(receiver, ast.Attribute)
                         and isinstance(receiver.value, ast.Name)
                         and receiver.value.id == "self"
-                        and receiver.attr.endswith("_combo")
+                        and receiver.attr not in {"after", "downloader"}
                     ):
-                        self.fail(f"Worker method {method.name} directly calls a Tk widget method")
+                        self.fail(
+                            f"Worker method {method.name} directly calls self.{receiver.attr}"
+                        )
 
     def test_tauri_cancel_kills_the_child_process(self):
         source = Path("app/src-tauri/src/main.rs").read_text(encoding="utf-8")
@@ -60,6 +62,43 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertNotIn('"fs":', config)
         self.assertNotIn('"csp": null', config)
         self.assertIn("script-src 'self'", config)
+
+
+    def test_tauri_frontend_settings_are_loaded_and_folder_picker_is_wired(self):
+        source = Path("app/src/main.js").read_text(encoding="utf-8")
+        self.assertIn("defaultPathInput.value = config.defaultPath || 'downloads'", source)
+        self.assertIn("defaultQualitySelect.value = config.defaultQuality || '1080p'", source)
+        self.assertIn("browseDefaultBtn.addEventListener('click'", source)
+        self.assertIn("if (folder) defaultPathInput.value = folder", source)
+
+    def test_tauri_metadata_requests_ignore_stale_responses(self):
+        source = Path("app/src/main.js").read_text(encoding="utf-8")
+        self.assertIn("let infoRequestSequence = 0", source)
+        self.assertIn("const requestId = ++infoRequestSequence", source)
+        self.assertIn("if (requestId !== infoRequestSequence) return", source)
+
+    def test_python_mp3_selection_requires_ffmpeg(self):
+        source = Path("downloader.py").read_text(encoding="utf-8")
+        self.assertIn("if not ffmpeg and quality == 'Только аудио (MP3)'", source)
+        self.assertIn("Для извлечения аудио в MP3 необходим FFmpeg", source)
+
+    def test_python_cancel_flag_is_reset_before_worker_start(self):
+        source = Path("downloader.py").read_text(encoding="utf-8")
+        reset = source.index("self.downloader.cancel_flag = False")
+        worker_start = source.index("thread.start()", reset)
+        self.assertLess(reset, worker_start)
+        download_method = source[source.index("    def download("):source.index("\n\n# ==================== GUI")]
+        self.assertNotIn("self.cancel_flag = False", download_method)
+
+    def test_tauri_embedded_download_checks_real_output_and_ffmpeg(self):
+        source = Path("app/src-tauri/src/main.rs").read_text(encoding="utf-8")
+        scripts = __import__("re").findall(r'let python_script = r#"(.*?)"#;', source, flags=__import__("re").DOTALL)
+        self.assertEqual(len(scripts), 2)
+        download_script = scripts[1]
+        self.assertIn("if format_type == 'audio' and not has_ffmpeg", download_script)
+        self.assertIn("if filename is None", download_script)
+        self.assertIn("os.path.isfile(candidate)", download_script)
+        self.assertIn("def download(url, quality, format_type, save_path, ffmpeg_arg=None)", download_script)
 
     def test_python_launcher_uses_the_same_interpreter_for_pip(self):
         launcher = Path("run.bat").read_text(encoding="utf-8")
