@@ -10,7 +10,7 @@ let selectedFormat = 'video';
 let isDownloading = false;
 let config = {
     apiKey: '',
-    defaultPath: 'C:\\Users\\Smixr\\Downloads',
+    defaultPath: 'downloads',
     defaultQuality: '1080p'
 };
 
@@ -146,7 +146,12 @@ function loadConfig() {
         if (saved) {
             config = { ...config, ...JSON.parse(saved) };
         }
-        savePathInput.value = config.defaultPath;
+        // Migrate the old developer-machine default instead of exposing a dead path.
+        if (/^C:\\\\Users\\\\Smixr\\\\/i.test(config.defaultPath || '')) {
+            config.defaultPath = 'downloads';
+            localStorage.setItem('downloader_config', JSON.stringify(config));
+        }
+        savePathInput.value = config.defaultPath || 'downloads';
     } catch (err) {
         console.error('Failed to load config:', err);
     }
