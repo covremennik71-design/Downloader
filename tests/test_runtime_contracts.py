@@ -44,7 +44,7 @@ class RuntimeContractTests(unittest.TestCase):
         dev = Path("dev.bat").read_text(encoding="utf-8")
         ffmpeg = Path("download_ffmpeg.bat").read_text(encoding="utf-8")
         self.assertIn('cd /d "%~dp0"', build)
-        self.assertIn('pushd "app\\\\src-tauri"', dev)
+        self.assertIn('pushd "app\\src-tauri"', dev)
         self.assertNotIn("Python314", build)
         self.assertIn("Invoke-WebRequest", ffmpeg)
 
