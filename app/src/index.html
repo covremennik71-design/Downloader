@@ -80,14 +80,26 @@
             <section class="video-info-section" id="videoInfoSection" style="display: none;">
                 <div class="video-card">
                     <div class="video-thumbnail">
-                        <img id="videoThumbnail" src="" alt="Video thumbnail">
+                        <img id="videoThumbnail" src="" alt="Предпросмотр видео">
                         <div class="video-duration" id="videoDuration">0:00</div>
+                        <div class="preview-caption">ПРЕДПРОСМОТР</div>
                     </div>
                     <div class="video-details">
-                        <h2 class="video-title" id="videoTitle">Название видео</h2>
-                        <div class="video-meta">
-                            <span class="video-uploader" id="videoUploader">Канал</span>
-                            <span class="video-views" id="videoViews">0 просмотров</span>
+                        <button class="download-btn video-download-btn" id="downloadBtn">
+                            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <span>Скачать</span>
+                        </button>
+                        <div class="video-description-panel">
+                            <h2 class="video-title" id="videoTitle">Название видео</h2>
+                            <div class="video-meta">
+                                <span class="video-uploader" id="videoUploader">Канал</span>
+                                <span class="video-views" id="videoViews">0 просмотров</span>
+                            </div>
+                            <p class="video-description" id="videoDescription">Описание видео появится здесь после получения информации.</p>
                         </div>
                     </div>
                 </div>
@@ -132,15 +144,7 @@
                     </div>
                 </div>
 
-                <!-- Download Button -->
-                <button class="download-btn" id="downloadBtn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    <span>Скачать</span>
-                </button>
+
             </section>
 
             <!-- Progress Section (hidden initially) -->
