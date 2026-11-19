@@ -522,7 +522,7 @@ class DownloaderApp(ctk.CTk):
         
         self.browse_btn = ctk.CTkButton(
             path_inner,
-            text="📁",
+            text="Папка",
             width=40,
             height=35,
             fg_color="#34373d", hover_color="#50545b",
@@ -701,10 +701,10 @@ class DownloaderApp(ctk.CTk):
             duration_str = str(timedelta(seconds=duration)) if duration else "N/A"
             
             info_text = (
-                f"📹 {info.get('title', 'Unknown')}\n"
-                f"👤 {info.get('uploader', 'Unknown')}\n"
-                f"⏱️ Длительность: {duration_str}\n"
-                f"🎬 Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}\n"
+                f"{info.get('title', 'Unknown')}\n"
+                f"Автор: {info.get('uploader', 'Unknown')}\n"
+                f"Длительность: {duration_str}\n"
+                f"Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}\n"
                 f"\n{(info.get('description') or 'Описание не предоставлено')[:420]}"
             )
             
@@ -792,10 +792,10 @@ class DownloaderApp(ctk.CTk):
             duration_str = str(timedelta(seconds=duration)) if duration else "N/A"
             
             info_text = (
-                f"📹 {info.get('title', 'Unknown')}\n"
-                f"👤 {info.get('uploader', 'Unknown')}\n"
-                f"⏱️ Длительность: {duration_str}\n"
-                f"🎬 Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}\n"
+                f"{info.get('title', 'Unknown')}\n"
+                f"Автор: {info.get('uploader', 'Unknown')}\n"
+                f"Длительность: {duration_str}\n"
+                f"Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}\n"
                 f"\n{(info.get('description') or 'Описание не предоставлено')[:420]}"
             )
             
@@ -832,7 +832,8 @@ class DownloaderApp(ctk.CTk):
         # Создаём диалог выбора качества
         dialog = ctk.CTkToplevel(self)
         dialog.title("Выберите качество")
-        dialog.geometry("400x300")
+        dialog.geometry("440x320")
+        dialog.configure(fg_color="#08090b")
         dialog.resizable(False, False)
         dialog.transient(self)
         dialog.grab_set()
@@ -846,13 +847,13 @@ class DownloaderApp(ctk.CTk):
         # Заголовок
         title_label = ctk.CTkLabel(
             dialog,
-            text="🎬 Выберите качество для загрузки",
+            text=" Выберите качество для загрузки",
             font=ctk.CTkFont(size=16, weight="bold")
         )
         title_label.pack(pady=(20, 10))
         
         # Информация о видео
-        info_text = f"📹 {self.current_info.get('title', 'Unknown')}"
+        info_text = f"{self.current_info.get('title', 'Unknown')}"
         info_label = ctk.CTkLabel(
             dialog,
             text=info_text,
@@ -875,7 +876,11 @@ class DownloaderApp(ctk.CTk):
             height=35,
             width=300,
             font=ctk.CTkFont(size=13),
-            state="readonly"
+            state="readonly",
+            fg_color="#101115", border_color="#777b83",
+            button_color="#45484e", button_hover_color="#666a72",
+            text_color="#f3f4f5", dropdown_fg_color="#17181c",
+            dropdown_hover_color="#34373d", dropdown_text_color="#f3f4f5"
         )
         
         # Устанавливаем рекомендованное качество
@@ -913,7 +918,8 @@ class DownloaderApp(ctk.CTk):
             height=35,
             font=ctk.CTkFont(size=13, weight="bold"),
             fg_color="#d9dce0",
-            hover_color="#ffffff",
+            hover_color="#ffffff", text_color="#101114",
+            border_color="#aeb2b9", border_width=1,
             command=on_confirm
         ).pack(side="left", fill="x", expand=True, padx=(0, 5))
         
@@ -923,7 +929,8 @@ class DownloaderApp(ctk.CTk):
             height=35,
             font=ctk.CTkFont(size=13),
             fg_color="#292b30",
-            hover_color="#45484e",
+            hover_color="#45484e", text_color="#f1f2f4",
+            border_color="#777b83", border_width=1,
             command=on_cancel
         ).pack(side="left", fill="x", expand=True, padx=(5, 0))
     
@@ -1115,7 +1122,7 @@ class SettingsWindow(ctk.CTkToplevel):
             main_frame,
             text="Ключ нужен для поиска видео. Получить: https://console.cloud.google.com/",
             font=ctk.CTkFont(size=11),
-            text_color="gray",
+            text_color="#aeb2b9",
             wraplength=450
         ).pack(anchor="w", pady=(0, 5))
         
@@ -1152,9 +1159,11 @@ class SettingsWindow(ctk.CTkToplevel):
         
         ctk.CTkButton(
             path_frame,
-            text="📁",
+            text="Папка",
             width=40,
             height=35,
+            fg_color="#34373d", hover_color="#50545b",
+            border_color="#aeb2b9", border_width=1, text_color="#ffffff",
             command=self.browse_path
         ).pack(side="right")
         
@@ -1171,7 +1180,11 @@ class SettingsWindow(ctk.CTkToplevel):
                    "Лучшее качество", "Только аудио (MP3)"],
             height=35,
             font=ctk.CTkFont(size=12),
-            state="readonly"
+            state="readonly",
+            fg_color="#101115", border_color="#777b83",
+            button_color="#45484e", button_hover_color="#666a72",
+            text_color="#f3f4f5", dropdown_fg_color="#17181c",
+            dropdown_hover_color="#34373d", dropdown_text_color="#f3f4f5"
         )
         self.quality_combo.set(self.config.get("default_quality", "720p"))
         self.quality_combo.pack(fill="x", pady=(0, 5))
@@ -1185,6 +1198,8 @@ class SettingsWindow(ctk.CTkToplevel):
             text="Сохранить",
             height=35,
             font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#d9dce0", hover_color="#ffffff", text_color="#101114",
+            border_color="#aeb2b9", border_width=1,
             command=self.save_settings
         ).pack(side="left", fill="x", expand=True, padx=(0, 5))
         
