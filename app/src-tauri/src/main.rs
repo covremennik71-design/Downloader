@@ -121,6 +121,7 @@ def get_info(url):
                 'duration': info.get('duration', 0),
                 'uploader': info.get('uploader', 'Unknown'),
                 'view_count': info.get('view_count', 0),
+                'description': (info.get('description') or '')[:1200],
                 'formats': unique_formats
             }
             
