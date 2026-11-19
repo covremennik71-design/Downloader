@@ -454,7 +454,9 @@ class DownloaderApp(ctk.CTk):
             url_frame,
             height=40,
             placeholder_text="https://www.youtube.com/watch?v=...",
-            font=ctk.CTkFont(size=13)
+            font=ctk.CTkFont(size=13),
+            fg_color="#101115", border_color="#858990",
+            text_color="#f3f4f5", placeholder_text_color="#858990"
         )
         self.url_entry.pack(fill="x", pady=(0, 5))
         self.url_entry.bind("<KeyRelease>", self._invalidate_video_info)
@@ -539,6 +541,9 @@ class DownloaderApp(ctk.CTk):
             text="Получить информацию",
             height=40,
             font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color="#303238", hover_color="#50545b",
+            border_color="#aeb2b9", border_width=1,
+            text_color="#f3f4f5",
             command=self.get_info
         )
         self.get_info_btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
@@ -914,7 +919,7 @@ class DownloaderApp(ctk.CTk):
         
         ctk.CTkButton(
             btn_frame,
-            text="❌ Отмена",
+            text="Отмена",
             height=35,
             font=ctk.CTkFont(size=13),
             fg_color="#292b30",
@@ -1102,7 +1107,7 @@ class SettingsWindow(ctk.CTkToplevel):
         # ===== YouTube API Key =====
         ctk.CTkLabel(
             main_frame,
-            text="🔑 YouTube Data API Key",
+            text="YouTube Data API Key",
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(anchor="w", pady=(0, 5))
         
@@ -1128,7 +1133,7 @@ class SettingsWindow(ctk.CTkToplevel):
         # ===== Папка загрузок =====
         ctk.CTkLabel(
             main_frame,
-            text="📁 Папка для загрузок по умолчанию",
+            text="Папка для загрузок по умолчанию",
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(anchor="w", pady=(15, 5))
         
@@ -1156,7 +1161,7 @@ class SettingsWindow(ctk.CTkToplevel):
         # ===== Качество по умолчанию =====
         ctk.CTkLabel(
             main_frame,
-            text="🎬 Качество по умолчанию",
+            text="Качество по умолчанию",
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(anchor="w", pady=(15, 5))
         
@@ -1177,7 +1182,7 @@ class SettingsWindow(ctk.CTkToplevel):
         
         ctk.CTkButton(
             btn_frame,
-            text="💾 Сохранить",
+            text="Сохранить",
             height=35,
             font=ctk.CTkFont(size=12, weight="bold"),
             command=self.save_settings
@@ -1185,7 +1190,7 @@ class SettingsWindow(ctk.CTkToplevel):
         
         ctk.CTkButton(
             btn_frame,
-            text="❌ Отмена",
+            text="Отмена",
             height=35,
             font=ctk.CTkFont(size=12),
             fg_color="#292b30",
