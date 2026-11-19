@@ -517,16 +517,7 @@ class DownloaderApp(ctk.CTk):
         # ===== Кнопки управления =====
         btn_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         btn_frame.pack(fill="x", pady=15)
-        
-        self.get_info_btn = ctk.CTkButton(
-            btn_frame,
-            text="🔍 Получить информацию",
-            height=40,
-            font=ctk.CTkFont(size=13, weight="bold"),
-            command=self.get_info
-        )
-        self.get_info_btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
-        
+      
         self.download_btn = ctk.CTkButton(
             btn_frame,
             text="⬇️ Скачать",
@@ -540,7 +531,7 @@ class DownloaderApp(ctk.CTk):
         
         self.cancel_btn = ctk.CTkButton(
             btn_frame,
-            text="❌ Отмена",
+            text="Отмена",
             height=40,
             font=ctk.CTkFont(size=13, weight="bold"),
             fg_color="#dc3545",
@@ -581,7 +572,7 @@ class DownloaderApp(ctk.CTk):
         
         self.settings_btn = ctk.CTkButton(
             bottom_frame,
-            text="⚙️ Настройки",
+            text="Настройки",
             width=120,
             height=32,
             font=ctk.CTkFont(size=12),
@@ -610,7 +601,7 @@ class DownloaderApp(ctk.CTk):
         ffmpeg = find_ffmpeg()
         if not ffmpeg:
             self.api_label.configure(
-                text="⚠️ FFmpeg не найден! Видео будет без звука."
+                text="FFmpeg не найден! Видео будет без звука."
             )
         else:
             print(f"[APP] FFmpeg found: {ffmpeg}")
@@ -671,10 +662,10 @@ class DownloaderApp(ctk.CTk):
             duration_str = str(timedelta(seconds=duration)) if duration else "N/A"
             
             info_text = (
-                f"📹 {info.get('title', 'Unknown')}\n"
-                f"👤 {info.get('uploader', 'Unknown')}\n"
-                f"⏱️ Длительность: {duration_str}\n"
-                f"🎬 Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}"
+                f"{info.get('title', 'Unknown')}\n"
+                f"{info.get('uploader', 'Unknown')}\n"
+                f"Длительность: {duration_str}\n"
+                f"Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}"
             )
             
             self.after(0, lambda: self._show_info(info_text, info, qualities, url))
@@ -761,10 +752,10 @@ class DownloaderApp(ctk.CTk):
             duration_str = str(timedelta(seconds=duration)) if duration else "N/A"
             
             info_text = (
-                f"📹 {info.get('title', 'Unknown')}\n"
-                f"👤 {info.get('uploader', 'Unknown')}\n"
-                f"⏱️ Длительность: {duration_str}\n"
-                f"🎬 Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}"
+                f"Название {info.get('title', 'Unknown')}\n"
+                f"{info.get('uploader', 'Unknown')}\n"
+                f"Длительность: {duration_str}\n"
+                f"Доступные качества: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}"
             )
             
             self.after(0, lambda: self._show_info_and_dialog(info_text, info, qualities, url))
@@ -814,13 +805,13 @@ class DownloaderApp(ctk.CTk):
         # Заголовок
         title_label = ctk.CTkLabel(
             dialog,
-            text="🎬 Выберите качество для загрузки",
+            text="Выберите качество для загрузки",
             font=ctk.CTkFont(size=16, weight="bold")
         )
         title_label.pack(pady=(20, 10))
         
         # Информация о видео
-        info_text = f"📹 {self.current_info.get('title', 'Unknown')}"
+        info_text = f"{self.current_info.get('title', 'Unknown')}"
         info_label = ctk.CTkLabel(
             dialog,
             text=info_text,
@@ -877,7 +868,7 @@ class DownloaderApp(ctk.CTk):
         
         ctk.CTkButton(
             btn_frame,
-            text="✅ Скачать",
+            text="Скачать",
             height=35,
             font=ctk.CTkFont(size=13, weight="bold"),
             fg_color="#28a745",
@@ -887,7 +878,7 @@ class DownloaderApp(ctk.CTk):
         
         ctk.CTkButton(
             btn_frame,
-            text="❌ Отмена",
+            text="Отмена",
             height=35,
             font=ctk.CTkFont(size=13),
             fg_color="gray",
@@ -1007,13 +998,13 @@ class DownloaderApp(ctk.CTk):
         """Загрузка завершена."""
         def update():
             self.progress_bar.set(1)
-            self.progress_label.configure(text="✅ Загрузка завершена!")
+            self.progress_label.configure(text="Загрузка завершена!")
             self.progress_frame.pack(fill="x", pady=5)
             
             self.download_btn.configure(state="normal")
             self.cancel_btn.configure(state="disabled")
             self.get_info_btn.configure(state="normal")
-            self.status_label.configure(text=f"✅ Сохранено: {os.path.basename(filepath)}", text_color="green")
+            self.status_label.configure(text=f"Сохранено: {os.path.basename(filepath)}", text_color="green")
             
             # Скрываем прогресс через 5 секунд
             self.after(5000, lambda: self.progress_frame.pack_forget())
@@ -1074,13 +1065,13 @@ class SettingsWindow(ctk.CTkToplevel):
         # ===== YouTube API Key =====
         ctk.CTkLabel(
             main_frame,
-            text="🔑 YouTube Data API Key",
+            text="Ваш YouTube API",
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(anchor="w", pady=(0, 5))
         
         ctk.CTkLabel(
             main_frame,
-            text="Ключ нужен для поиска видео. Получить: https://console.cloud.google.com/",
+            text="Ключ нужен для поиска видео. Получить: https://console.cloud.google.com",
             font=ctk.CTkFont(size=11),
             text_color="gray",
             wraplength=450
@@ -1098,7 +1089,7 @@ class SettingsWindow(ctk.CTkToplevel):
         # ===== Папка загрузок =====
         ctk.CTkLabel(
             main_frame,
-            text="📁 Папка для загрузок по умолчанию",
+            text="Место сохранения",
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(anchor="w", pady=(15, 5))
         
@@ -1115,7 +1106,7 @@ class SettingsWindow(ctk.CTkToplevel):
         
         ctk.CTkButton(
             path_frame,
-            text="📁",
+            text="",
             width=40,
             height=35,
             command=self.browse_path
@@ -1124,7 +1115,7 @@ class SettingsWindow(ctk.CTkToplevel):
         # ===== Качество по умолчанию =====
         ctk.CTkLabel(
             main_frame,
-            text="🎬 Качество по умолчанию",
+            text="Качество по умолчанию",
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(anchor="w", pady=(15, 5))
         
@@ -1145,7 +1136,7 @@ class SettingsWindow(ctk.CTkToplevel):
         
         ctk.CTkButton(
             btn_frame,
-            text="💾 Сохранить",
+            text="Сохранить",
             height=35,
             font=ctk.CTkFont(size=12, weight="bold"),
             command=self.save_settings
@@ -1153,7 +1144,7 @@ class SettingsWindow(ctk.CTkToplevel):
         
         ctk.CTkButton(
             btn_frame,
-            text="❌ Отмена",
+            text="Отмена",
             height=35,
             font=ctk.CTkFont(size=12),
             fg_color="gray",
