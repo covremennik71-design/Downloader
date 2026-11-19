@@ -640,7 +640,7 @@ class DownloaderApp(ctk.CTk):
         ffmpeg = find_ffmpeg()
         if not ffmpeg:
             self.api_label.configure(
-                text="⚠️ FFmpeg не найден! Видео будет без звука."
+                text="Внимание: FFmpeg не найден! Видео будет без звука."
             )
         else:
             print(f"[APP] FFmpeg found: {ffmpeg}")
@@ -914,7 +914,7 @@ class DownloaderApp(ctk.CTk):
         
         ctk.CTkButton(
             btn_frame,
-            text="✅ Скачать",
+            text="Скачать",
             height=35,
             font=ctk.CTkFont(size=13, weight="bold"),
             fg_color="#d9dce0",
@@ -1046,13 +1046,13 @@ class DownloaderApp(ctk.CTk):
         """Загрузка завершена."""
         def update():
             self.progress_bar.set(1)
-            self.progress_label.configure(text="✅ Загрузка завершена!")
+            self.progress_label.configure(text="Загрузка завершена!")
             self.progress_frame.pack(fill="x", pady=5)
             
             self.download_btn.configure(state="normal")
             self.cancel_btn.configure(state="disabled")
             self.get_info_btn.configure(state="normal")
-            self.status_label.configure(text=f"✅ Сохранено: {os.path.basename(filepath)}", text_color="#e1e3e6")
+            self.status_label.configure(text=f"Сохранено: {os.path.basename(filepath)}", text_color="#e1e3e6")
             
             # Скрываем прогресс через 5 секунд
             self.after(5000, lambda: self.progress_frame.pack_forget())
