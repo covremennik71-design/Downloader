@@ -28,6 +28,7 @@ const videoDuration = document.getElementById('videoDuration');
 const videoTitle = document.getElementById('videoTitle');
 const videoUploader = document.getElementById('videoUploader');
 const videoViews = document.getElementById('videoViews');
+const videoDescription = document.getElementById('videoDescription');
 const qualityGrid = document.getElementById('qualityGrid');
 const savePathInput = document.getElementById('savePathInput');
 const browseBtn = document.getElementById('browseBtn');
@@ -259,6 +260,11 @@ function displayVideoInfo(info) {
 
     // Views
     videoViews.textContent = info.view_count ? formatViews(info.view_count) + ' views' : '0 views';
+
+    // Description (textContent keeps metadata safe from embedded HTML).
+    const description = (info.description || '').trim();
+    videoDescription.textContent = description || 'Описание для этого видео не предоставлено.';
+    videoDescription.title = description;
 
     // Render quality options
     renderQualityOptions();
