@@ -699,8 +699,8 @@ class DownloaderApp(ctk.CTk):
                 f"📹 {info.get('title', 'Unknown')}\n"
                 f"👤 {info.get('uploader', 'Unknown')}\n"
                 f"⏱️ Длительность: {duration_str}\n"
-                f"🎬 Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}\\n"
-                f"\\n{(info.get('description') or 'Описание не предоставлено')[:420]}"
+                f"🎬 Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}\n"
+                f"\n{(info.get('description') or 'Описание не предоставлено')[:420]}"
             )
             
             self.after(0, lambda: self._show_info(info_text, info, qualities, url))
@@ -764,7 +764,7 @@ class DownloaderApp(ctk.CTk):
         if self.current_info is None or self.current_info_url != url:
             self.current_info = None
             self.current_info_url = None
-            self.status_label.configure(text="Получение информации о видео...", text_color="orange")
+            self.status_label.configure(text="Получение информации о видео...", text_color="#c9cbd0")
             self.download_btn.configure(state="disabled")
             self.get_info_btn.configure(state="disabled")
             
@@ -790,8 +790,8 @@ class DownloaderApp(ctk.CTk):
                 f"📹 {info.get('title', 'Unknown')}\n"
                 f"👤 {info.get('uploader', 'Unknown')}\n"
                 f"⏱️ Длительность: {duration_str}\n"
-                f"🎬 Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}\\n"
-                f"\\n{(info.get('description') or 'Описание не предоставлено')[:420]}"
+                f"🎬 Доступных качеств: {len([q for q in qualities if 'аудио' not in q and 'Лучшее' not in q])}\n"
+                f"\n{(info.get('description') or 'Описание не предоставлено')[:420]}"
             )
             
             self.after(0, lambda: self._show_info_and_dialog(info_text, info, qualities, url))
@@ -810,7 +810,7 @@ class DownloaderApp(ctk.CTk):
         self._apply_qualities(qualities)
         self.info_label.configure(text=info_text)
         self.info_frame.pack(fill="x", pady=10)
-        self.status_label.configure(text="Информация получена", text_color="green")
+        self.status_label.configure(text="Информация получена", text_color="#e1e3e6")
         self.download_btn.configure(state="normal")
         self.get_info_btn.configure(state="normal")
         
@@ -907,8 +907,8 @@ class DownloaderApp(ctk.CTk):
             text="✅ Скачать",
             height=35,
             font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color="#28a745",
-            hover_color="#218838",
+            fg_color="#d9dce0",
+            hover_color="#ffffff",
             command=on_confirm
         ).pack(side="left", fill="x", expand=True, padx=(0, 5))
         
@@ -917,8 +917,8 @@ class DownloaderApp(ctk.CTk):
             text="❌ Отмена",
             height=35,
             font=ctk.CTkFont(size=13),
-            fg_color="gray",
-            hover_color="darkgray",
+            fg_color="#292b30",
+            hover_color="#45484e",
             command=on_cancel
         ).pack(side="left", fill="x", expand=True, padx=(5, 0))
     
@@ -1009,14 +1009,14 @@ class DownloaderApp(ctk.CTk):
                 text += f" | Осталось: {eta_str}"
             
             self.progress_label.configure(text=text)
-            self.status_label.configure(text=f"Загрузка... {percent:.0f}%", text_color="orange")
+            self.status_label.configure(text=f"Загрузка... {percent:.0f}%", text_color="#c9cbd0")
         
         self.after(0, update)
     
     def on_info(self, message):
         """Обновить информационное сообщение."""
         self.after(0, lambda: self.progress_label.configure(text=message))
-        self.after(0, lambda: self.status_label.configure(text=message, text_color="orange"))
+        self.after(0, lambda: self.status_label.configure(text=message, text_color="#c9cbd0"))
     
     def on_error(self, error):
         """Обработать ошибку."""
@@ -1025,7 +1025,7 @@ class DownloaderApp(ctk.CTk):
             self.download_btn.configure(state="normal")
             self.cancel_btn.configure(state="disabled")
             self.get_info_btn.configure(state="normal")
-            self.status_label.configure(text=f"Ошибка: {error[:100]}", text_color="red")
+            self.status_label.configure(text=f"Ошибка: {error[:100]}", text_color="#d5d7db")
             messagebox.showerror("Ошибка загрузки", error)
         
         self.after(0, update)
@@ -1040,7 +1040,7 @@ class DownloaderApp(ctk.CTk):
             self.download_btn.configure(state="normal")
             self.cancel_btn.configure(state="disabled")
             self.get_info_btn.configure(state="normal")
-            self.status_label.configure(text=f"✅ Сохранено: {os.path.basename(filepath)}", text_color="green")
+            self.status_label.configure(text=f"✅ Сохранено: {os.path.basename(filepath)}", text_color="#e1e3e6")
             
             # Скрываем прогресс через 5 секунд
             self.after(5000, lambda: self.progress_frame.pack_forget())
@@ -1056,13 +1056,13 @@ class DownloaderApp(ctk.CTk):
             self.download_btn.configure(state="normal")
             self.cancel_btn.configure(state="disabled")
             self.get_info_btn.configure(state="normal")
-            self.status_label.configure(text="Загрузка отменена", text_color="orange")
+            self.status_label.configure(text="Загрузка отменена", text_color="#c9cbd0")
         self.after(0, update)
 
     def cancel_download(self):
         """Отменить загрузку."""
         self.downloader.cancel()
-        self.status_label.configure(text="Отмена загрузки...", text_color="orange")
+        self.status_label.configure(text="Отмена загрузки...", text_color="#c9cbd0")
         self.cancel_btn.configure(state="disabled")
     
     def open_settings(self):
@@ -1081,6 +1081,7 @@ class SettingsWindow(ctk.CTkToplevel):
         
         self.title("Настройки")
         self.geometry("500x400")
+        self.configure(fg_color="#08090b")
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -1117,7 +1118,9 @@ class SettingsWindow(ctk.CTkToplevel):
             main_frame,
             height=35,
             font=ctk.CTkFont(size=12),
-            placeholder_text="AIzaSy..."
+            placeholder_text="AIzaSy...",
+            fg_color="#101115", border_color="#777b83",
+            text_color="#f3f4f5", placeholder_text_color="#858990"
         )
         self.api_entry.pack(fill="x", pady=(0, 5))
         self.api_entry.insert(0, self.config.get("youtube_api_key", ""))
@@ -1135,7 +1138,9 @@ class SettingsWindow(ctk.CTkToplevel):
         self.path_entry = ctk.CTkEntry(
             path_frame,
             height=35,
-            font=ctk.CTkFont(size=12)
+            font=ctk.CTkFont(size=12),
+            fg_color="#101115", border_color="#777b83",
+            text_color="#f3f4f5"
         )
         self.path_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
         self.path_entry.insert(0, self.config.get("download_path", DOWNLOADS_DIR))
@@ -1183,8 +1188,8 @@ class SettingsWindow(ctk.CTkToplevel):
             text="❌ Отмена",
             height=35,
             font=ctk.CTkFont(size=12),
-            fg_color="gray",
-            hover_color="darkgray",
+            fg_color="#292b30",
+            hover_color="#45484e",
             command=self.destroy
         ).pack(side="left", fill="x", expand=True, padx=(5, 0))
     
