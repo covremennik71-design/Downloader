@@ -546,7 +546,7 @@ class DownloaderApp(ctk.CTk):
             text_color="#f3f4f5",
             command=self.get_info
         )
-        self.get_info_btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        # Keep the button object and callback for internal state management, but do not pack it into the visible UI.
         
         self.download_btn = ctk.CTkButton(
             btn_frame,
