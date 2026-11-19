@@ -57,10 +57,10 @@
     "windows": [
       {
         "fullscreen": false,
-        "height": 600,
+        "height": 820,
         "resizable": true,
         "title": "YouTube Downloader",
-        "width": 800
+        "width": 1120
       }
     ]
   }
